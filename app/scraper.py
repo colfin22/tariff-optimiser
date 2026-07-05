@@ -84,8 +84,9 @@ def fetch(url: str) -> str:
 
 
 def _suggest(conn, plan_id, field, current, suggested, detail):
+    # pending = don't re-queue; dismissed = the user said no to THIS value, stay quiet unless it changes again
     dup = conn.execute(
-        "SELECT 1 FROM suggestions WHERE status='pending' AND plan_id IS ? AND field=? AND suggested IS ? AND detail=?",
+        "SELECT 1 FROM suggestions WHERE status IN ('pending','dismissed') AND plan_id IS ? AND field=? AND suggested IS ? AND detail=?",
         (plan_id, field, suggested, detail)).fetchone()
     if not dup:
         conn.execute("INSERT INTO suggestions(plan_id,field,current,suggested,detail,created) VALUES(?,?,?,?,?,?)",
