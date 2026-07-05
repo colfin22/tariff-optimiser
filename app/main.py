@@ -7,7 +7,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import alerts, db, engine, ingest
+from . import alerts, db, engine, ingest, scraper
 
 app = FastAPI(title="Irish Tariff Optimiser")
 BASE = os.path.dirname(__file__)
@@ -57,15 +57,58 @@ def dashboard(request: Request, days: int = 365):
 def plans_page(request: Request):
     c = conn()
     try:
+        c.executescript(scraper.SCHEMA)
         plans = c.execute("SELECT * FROM plans ORDER BY active DESC, supplier, name").fetchall()
         bands = {}
         for b in c.execute("SELECT * FROM rate_bands ORDER BY plan_id, priority DESC, start_time"):
             bands.setdefault(b["plan_id"], []).append(b)
+        suggestions = c.execute("SELECT * FROM suggestions WHERE status='pending' ORDER BY id").fetchall()
         return templates.TemplateResponse(request, "plans.html",
-                                          {"plans": plans, "bands": bands,
+                                          {"plans": plans, "bands": bands, "suggestions": suggestions,
                                            "current_id": db.get_setting(c, "current_plan_id")})
     finally:
         c.close()
+
+
+@app.post("/api/scrape")
+def api_scrape():
+    c = conn()
+    try:
+        return scraper.scrape_and_notify(c)
+    finally:
+        c.close()
+
+
+@app.post("/suggestions/{sid}/apply")
+def suggestion_apply(sid: int):
+    c = conn()
+    try:
+        scraper.apply_suggestion(c, sid)
+    finally:
+        c.close()
+    return RedirectResponse("/plans", status_code=303)
+
+
+@app.post("/suggestions/{sid}/dismiss")
+def suggestion_dismiss(sid: int):
+    c = conn()
+    try:
+        c.execute("UPDATE suggestions SET status='dismissed' WHERE id=?", (sid,))
+        c.commit()
+    finally:
+        c.close()
+    return RedirectResponse("/plans", status_code=303)
+
+
+@app.post("/suggestions/apply_all")
+def suggestions_apply_all():
+    c = conn()
+    try:
+        for s in c.execute("SELECT id FROM suggestions WHERE status='pending' AND plan_id IS NOT NULL").fetchall():
+            scraper.apply_suggestion(c, s["id"])
+    finally:
+        c.close()
+    return RedirectResponse("/plans", status_code=303)
 
 
 @app.post("/plans/new")

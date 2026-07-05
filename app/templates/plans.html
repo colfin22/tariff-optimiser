@@ -2,6 +2,28 @@
 {% block content %}
 <h1>Tariff plans</h1>
 
+{% if suggestions %}
+<div class="card" style="border-color: var(--warn)">
+  <h2>&#9888; Scraped rate changes awaiting review ({{ suggestions|length }})</h2>
+  <table>
+    <tr><th>What</th><th>Stored</th><th>Selectra</th><th></th></tr>
+    {% for s in suggestions %}
+    <tr>
+      <td>{{ s.detail }}</td>
+      <td class="cost">{{ s.current if s.current is not none else '' }}</td>
+      <td class="cost">{{ s.suggested if s.suggested is not none else '' }}</td>
+      <td>
+        {% if s.plan_id %}<form class="inline" method="post" action="/suggestions/{{ s.id }}/apply"><button class="small">Apply</button></form>{% endif %}
+        <form class="inline" method="post" action="/suggestions/{{ s.id }}/dismiss"><button class="small danger">Dismiss</button></form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  <form class="inline" method="post" action="/suggestions/apply_all"><button>Apply all</button></form>
+  <p class="dim">Rates scraped monthly from selectra.ie (unit rates converted to incl. 9% VAT). Applying also bumps the plan's "rates as of" date. Time windows aren't scraped — verify those in the supplier's terms.</p>
+</div>
+{% endif %}
+
 {% for p in plans %}
 <div class="card">
   <form method="post" action="/plans/{{ p.id }}/update">
