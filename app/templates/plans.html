@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Tariff plans</h1>
+
+{% for p in plans %}
+<div class="card">
+  <form method="post" action="/plans/{{ p.id }}/update">
+    <div class="formrow">
+      <label>Supplier <input name="supplier" value="{{ p.supplier }}" required></label>
+      <label>Plan name <input name="name" value="{{ p.name }}" required size="28"></label>
+      <label>Standing &euro;/yr <input name="standing" type="number" step="0.01" value="{{ p.standing_charge_annual }}"></label>
+      <label>Export &euro;/kWh <input name="export_rate" type="number" step="0.0001" value="{{ p.export_rate }}"></label>
+      <label>Signup credit &euro; <input name="signup_credit" type="number" step="0.01" value="{{ p.signup_credit }}"></label>
+      <label>Rates as of <input name="rates_as_of" value="{{ p.rates_as_of }}" placeholder="YYYY-MM-DD" size="10"></label>
+      <label>Active <select name="active"><option value="1" {% if p.active %}selected{% endif %}>yes</option><option value="0" {% if not p.active %}selected{% endif %}>no</option></select></label>
+    </div>
+    <div class="formrow">
+      <label>URL <input name="url" value="{{ p.url }}" size="40"></label>
+      <label>Notes <input name="notes" value="{{ p.notes }}" size="40"></label>
+      <button>Save</button>
+    </div>
+  </form>
+  <form class="inline" method="post" action="/plans/{{ p.id }}/duplicate"><button class="small">Duplicate</button></form>
+  <form class="inline" method="post" action="/plans/{{ p.id }}/delete" onsubmit="return confirm('Delete {{ p.supplier }} {{ p.name }}?')"><button class="small danger">Delete</button></form>
+  {% if current_id == p.id|string %}<span class="badge current">current plan</span>{% endif %}
+
+  <table>
+    <tr><th>Band</th><th>&euro;/kWh</th><th>Window</th><th>Days</th><th>Priority</th><th></th></tr>
+    {% for b in bands.get(p.id, []) %}
+    <tr>
+      <td>{{ b.label }}</td><td class="cost">{{ b.rate }}</td>
+      <td>{{ b.start_time }}&ndash;{{ b.end_time }}</td>
+      <td>{{ b.dow_mask|dow }}</td><td>{{ b.priority }}</td>
+      <td><form class="inline" method="post" action="/bands/{{ b.id }}/delete"><button class="small danger">&times;</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <details><summary>add band</summary>
+  <form method="post" action="/plans/{{ p.id }}/bands/new">
+    <div class="formrow">
+      <label>Label <input name="label" required placeholder="Day / Night / Peak / EV / Free"></label>
+      <label>&euro;/kWh <input name="rate" type="number" step="0.0001" required></label>
+      <label>Start <input name="start_time" required placeholder="08:00" size="5"></label>
+      <label>End <input name="end_time" required placeholder="23:00" size="5"></label>
+      <label>Priority <input name="priority" type="number" value="0" size="3"></label>
+    </div>
+    <div class="formrow">
+      {% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+      <label style="flex-direction:row">{{ d }} <input type="checkbox" name="dow" value="{{ loop.index0 }}" checked></label>
+      {% endfor %}
+      <button>Add band</button>
+    </div>
+  </form>
+  </details>
+</div>
+{% endfor %}
+
+<div class="card">
+  <h2>New plan</h2>
+  <form method="post" action="/plans/new">
+    <div class="formrow">
+      <label>Supplier <input name="supplier" required></label>
+      <label>Plan name <input name="name" required size="28"></label>
+      <label>Standing &euro;/yr <input name="standing" type="number" step="0.01" value="0"></label>
+      <label>Export &euro;/kWh <input name="export_rate" type="number" step="0.0001" value="0"></label>
+      <label>Signup credit &euro; <input name="signup_credit" type="number" step="0.01" value="0"></label>
+      <label>Rates as of <input name="rates_as_of" placeholder="YYYY-MM-DD" size="10"></label>
+      <button>Create</button>
+    </div>
+  </form>
+  <p class="dim">Enter rates including VAT. Bands must cover all 168 hours (use a wrapping 00:00&ndash;00:00 band for flat plans); use priority to layer Peak/EV/Free windows over Day/Night.</p>
+</div>
+{% endblock %}

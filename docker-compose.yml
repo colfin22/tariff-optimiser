@@ -1,0 +1,9 @@
+services:
+  tariff:
+    build: .
+    container_name: tariff-optimiser
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data

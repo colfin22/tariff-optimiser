@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Settings</h1>
+<div class="card">
+<form method="post" action="/settings">
+  <div class="formrow">
+    <label>Current plan
+      <select name="current_plan_id">
+        <option value="">&mdash;</option>
+        {% for p in plans %}<option value="{{ p.id }}" {% if s.current_plan_id == p.id|string %}selected{% endif %}>{{ p.supplier }} {{ p.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Contract start <input name="contract_start" value="{{ s.contract_start }}" placeholder="YYYY-MM-DD" size="10"></label>
+    <label>Contract months <input name="contract_months" value="{{ s.contract_months or '12' }}" size="4"></label>
+  </div>
+  <div class="formrow">
+    <label>HA URL <input name="ha_url" value="{{ s.ha_url or 'http://homeassistant.local:8123' }}" size="30"></label>
+    <label>HA token <input name="ha_token" type="password" placeholder="{% if s.ha_token %}(saved — blank keeps it){% else %}long-lived token{% endif %}" size="30"></label>
+    <label>Notify service <input name="notify_service" value="{{ s.notify_service or 'mobile_app_np3' }}" size="20"></label>
+  </div>
+  <button>Save</button>
+</form>
+</div>
+<div class="card">
+  <h2>Test notification</h2>
+  <form method="post" action="/api/notify/test"><button>Send test push</button></form>
+  <p class="dim">Alerts fire automatically at 30 and 7 days before contract end (daily check at 10:00).</p>
+</div>
+{% endblock %}
