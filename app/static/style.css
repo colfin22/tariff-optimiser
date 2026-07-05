@@ -1,0 +1,30 @@
+:root { --bg:#111418; --card:#1b2026; --text:#e8eaed; --dim:#9aa0a6; --accent:#4dabf7; --good:#51cf66; --warn:#ffa94d; --bad:#ff6b6b; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); }
+nav { display:flex; gap:1.2rem; align-items:center; padding:0.8rem 1.2rem; background:var(--card); border-bottom:1px solid #2a3038; }
+nav .brand { font-weight:700; margin-right:1rem; }
+nav a { color:var(--dim); text-decoration:none; }
+nav a:hover { color:var(--text); }
+main { max-width: 1100px; margin: 1.2rem auto; padding: 0 1rem; }
+.card { background:var(--card); border:1px solid #2a3038; border-radius:10px; padding:1rem 1.2rem; margin-bottom:1rem; }
+h1 { font-size:1.3rem; } h2 { font-size:1.05rem; color:var(--dim); }
+table { width:100%; border-collapse:collapse; }
+th, td { text-align:left; padding:0.45rem 0.6rem; border-bottom:1px solid #2a3038; }
+th { color:var(--dim); font-weight:600; font-size:0.85rem; }
+tr.current { outline:2px solid var(--accent); border-radius:6px; }
+.badge { padding:0.1rem 0.5rem; border-radius:99px; font-size:0.75rem; background:#2a3038; color:var(--dim); }
+.badge.best { background:var(--good); color:#000; }
+.badge.current { background:var(--accent); color:#000; }
+.save { color:var(--good); font-weight:600; }
+.cost { font-variant-numeric: tabular-nums; }
+.warn { color:var(--warn); } .bad { color:var(--bad); } .dim { color:var(--dim); }
+form.inline { display:inline; }
+input, select, textarea { background:#12161b; color:var(--text); border:1px solid #2a3038; border-radius:6px; padding:0.35rem 0.5rem; }
+button { background:var(--accent); border:none; color:#000; font-weight:600; padding:0.4rem 0.9rem; border-radius:6px; cursor:pointer; }
+button.small { padding:0.15rem 0.6rem; font-size:0.8rem; }
+button.danger { background:var(--bad); }
+.grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:0.6rem; }
+.formrow { display:flex; flex-wrap:wrap; gap:0.6rem; margin-bottom:0.6rem; align-items:end; }
+.formrow label { display:flex; flex-direction:column; font-size:0.8rem; color:var(--dim); gap:0.2rem; }
+details summary { cursor:pointer; color:var(--dim); margin:0.4rem 0; }
+.banner { padding:0.7rem 1rem; border-radius:8px; margin-bottom:1rem; background:#332b17; border:1px solid var(--warn); }

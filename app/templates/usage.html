@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Usage profile</h1>
+<div class="card">
+  <h2>Average half-hourly profile (trailing {{ days }} days) &mdash; where your kWh actually land</h2>
+  <canvas id="profile" height="90"></canvas>
+</div>
+<div class="card">
+  <h2>Monthly import / export (kWh)</h2>
+  <canvas id="monthly" height="90"></canvas>
+</div>
+<script src="/static/chart.umd.min.js"></script>
+<script>
+const profile = {{ profile|safe }};
+const monthly = {{ monthly|safe }};
+new Chart(document.getElementById('profile'), {
+  type: 'bar',
+  data: { labels: profile.map(r => r.hm),
+    datasets: [
+      { label: 'Import kWh', data: profile.map(r => r.imp), backgroundColor: '#ffa94d' },
+      { label: 'Export kWh', data: profile.map(r => -r.exp), backgroundColor: '#51cf66' },
+    ]},
+  options: { scales: { x: { stacked: true, ticks: { color: '#9aa0a6', maxTicksLimit: 24 } },
+                       y: { stacked: true, ticks: { color: '#9aa0a6' } } },
+             plugins: { legend: { labels: { color: '#e8eaed' } } } }
+});
+new Chart(document.getElementById('monthly'), {
+  type: 'bar',
+  data: { labels: monthly.map(r => r.ym),
+    datasets: [
+      { label: 'Import kWh', data: monthly.map(r => r.imp), backgroundColor: '#ffa94d' },
+      { label: 'Export kWh', data: monthly.map(r => -r.exp), backgroundColor: '#51cf66' },
+    ]},
+  options: { scales: { x: { stacked: true, ticks: { color: '#9aa0a6' } },
+                       y: { stacked: true, ticks: { color: '#9aa0a6' } } },
+             plugins: { legend: { labels: { color: '#e8eaed' } } } }
+});
+</script>
+{% endblock %}

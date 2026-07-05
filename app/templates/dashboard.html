@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Plan ranking — trailing {{ days }} days of your actual usage</h1>
+
+{% if contract_end %}
+  {% if days_left is not none and days_left <= 30 %}
+  <div class="banner">&#9200; Your contract ends <b>{{ contract_end.strftime('%d-%m-%Y') }}</b> ({{ days_left }} days) — time to compare and switch.</div>
+  {% else %}
+  <p class="dim">Contract ends {{ contract_end.strftime('%d-%m-%Y') }} ({{ days_left }} days away).</p>
+  {% endif %}
+{% endif %}
+
+{% if not n_readings %}
+<div class="card">No meter data yet — run the ingest (POST /api/ingest) once the HDF file is in /data.</div>
+{% elif not ranking %}
+<div class="card">No active plans — add some on the <a href="/plans">Plans</a> page.</div>
+{% else %}
+<div class="card">
+<table>
+<tr><th></th><th>Supplier</th><th>Plan</th><th>Year-1 cost</th><th>Ongoing</th><th>vs current</th><th></th></tr>
+{% for r in ranking %}
+<tr {% if current_id and r.plan_id|string == current_id %}class="current"{% endif %}>
+  <td>{{ loop.index }}</td>
+  <td>{{ r.supplier }}</td>
+  <td>{{ r.name }}
+    {% if loop.first %}<span class="badge best">cheapest</span>{% endif %}
+    {% if current_id and r.plan_id|string == current_id %}<span class="badge current">current</span>{% endif %}
+  </td>
+  {% if r.error %}
+  <td colspan="3" class="bad">{{ r.error }}</td>
+  {% else %}
+  <td class="cost">&euro;{{ '%.0f' % r.annual_year1 }}</td>
+  <td class="cost dim">&euro;{{ '%.0f' % r.annual_ongoing }}</td>
+  <td class="cost">
+    {% if current and not r.error and r.plan_id != current.plan_id %}
+      {% set diff = current.annual_year1 - r.annual_year1 %}
+      {% if diff > 0 %}<span class="save">save &euro;{{ '%.0f' % diff }}</span>
+      {% else %}<span class="dim">+&euro;{{ '%.0f' % -diff }}</span>{% endif %}
+    {% endif %}
+  </td>
+  {% endif %}
+  <td>
+    <details><summary>breakdown</summary>
+      {% if not r.error %}
+      <table>
+      {% for label, b in r.per_band.items() %}
+        <tr><td>{{ label }}</td><td class="cost">{{ b.kwh }} kWh @ &euro;{{ b.rate }}</td><td class="cost">&euro;{{ '%.2f' % b.eur }}</td></tr>
+      {% endfor %}
+      <tr><td>Standing charge</td><td></td><td class="cost">&euro;{{ '%.2f' % r.standing }}</td></tr>
+      <tr><td>Export credit ({{ r.export_kwh }} kWh)</td><td></td><td class="cost save">&minus;&euro;{{ '%.2f' % r.export_credit }}</td></tr>
+      </table>
+      {% endif %}
+    </details>
+  </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+<p class="dim">Based on {{ n_readings }} half-hour readings; latest meter data {{ last_reading }} (ESB uploads lag 3&ndash;4 days &mdash; normal).
+Window: <a href="/?days=90">90d</a> &middot; <a href="/?days=180">180d</a> &middot; <a href="/?days=365">365d</a></p>
+{% endif %}
+{% endblock %}
