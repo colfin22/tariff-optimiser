@@ -64,7 +64,7 @@ PLANS = [
     ("Flogas", "Smart Electricity", 248.12, 0.185, "", "",
      [(DAY, 29.74), (NIGHT, 19.05), (PEAK, 35.19)]),
     ("Flogas", "Smart 24hr", 248.12, 0.185, "", "", [(FLAT, 27.30)]),
-    ("Pinergy", "Standard PAYG", 260.06, 0.25, "Pay-as-you-go; best export rate", "https://selectra.ie/energy/providers/pinergy/rates",
+    ("Pinergy", "Standard 24hr", 260.06, 0.25, "Pay-as-you-go; best export rate; name matches Selectra for the scraper", "https://selectra.ie/energy/providers/pinergy/rates",
      [(FLAT, 42.77)]),
 ]
 
