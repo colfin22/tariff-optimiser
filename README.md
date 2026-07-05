@@ -4,6 +4,8 @@ Self-hosted app that replays your actual ESB Networks half-hourly smart-meter da
 library of Irish electricity tariff plans and ranks them by true annual cost — including solar
 export credit, standing charges and time-of-use bands (day/night/peak/EV/free windows).
 
+![Plan ranking dashboard](docs/screenshot.png)
+
 ## How it works
 - A nightly job copies the HDF interval export (`esbn_hdf_latest.csv`, produced by the
   esbn-to-mqtt Home Assistant add-on) into `data/` and POSTs `/api/ingest`.
