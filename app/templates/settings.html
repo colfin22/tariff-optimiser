@@ -10,7 +10,7 @@
         {% for p in plans %}<option value="{{ p.id }}" {% if s.current_plan_id == p.id|string %}selected{% endif %}>{{ p.supplier }} {{ p.name }}</option>{% endfor %}
       </select>
     </label>
-    <label>Contract start <input name="contract_start" value="{{ s.contract_start }}" placeholder="YYYY-MM-DD" size="10"></label>
+    <label>Contract start <input name="contract_start" value="{{ s.contract_start }}" placeholder="DD-MM-YYYY" size="10"></label>
     <label>Contract months <input name="contract_months" value="{{ s.contract_months or '12' }}" size="4"></label>
   </div>
   <div class="formrow">
