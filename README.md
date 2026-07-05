@@ -26,6 +26,9 @@ and time windows:
 - Plans and their rate bands are managed in the UI (`/plans`); seed data for the six main
   suppliers is in `app/seed.py` with an as-of date — rates are entered including VAT.
 - Contract-expiry alerts fire at 30 and 7 days via a Home Assistant notify service (`/settings`).
+- A monthly **scrape-and-suggest** job (`POST /api/scrape`) checks the selectra.ie rate cards and
+  queues any rate differences as suggestions on the Plans page — nothing is applied without
+  review, parse failures alert loudly, and band time-windows still need a human eye.
 
 ## Run
     docker compose up -d --build
