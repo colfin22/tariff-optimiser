@@ -11,7 +11,7 @@ def contract_end(conn) -> date | None:
     months = int(db.get_setting(conn, "contract_months", "12"))
     if not start:
         return None
-    y, m, d = (int(x) for x in start.split("-"))
+    d, m, y = (int(x) for x in start.split("-"))  # DD-MM-YYYY
     m += months
     y, m = y + (m - 1) // 12, (m - 1) % 12 + 1
     try:
