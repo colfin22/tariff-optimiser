@@ -6,6 +6,14 @@ export credit, standing charges and time-of-use bands (day/night/peak/EV/free wi
 
 ![Plan ranking dashboard](docs/screenshot.png)
 
+The **Usage** tab shows where your kWh actually land across the day (the case for a night
+tariff at a glance) and monthly import/export; the **Plans** tab manages suppliers, rate bands
+and time windows:
+
+![Usage profile](docs/usage.png)
+
+![Plan editor](docs/plans.png)
+
 ## How it works
 - A nightly job copies the HDF interval export (`esbn_hdf_latest.csv`) into `data/` and POSTs
   `/api/ingest`. The file comes from [my fork of the esbn-to-mqtt Home Assistant add-on](https://github.com/colfin22/esbn-to-mqtt),
