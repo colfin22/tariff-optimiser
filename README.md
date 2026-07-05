@@ -7,8 +7,11 @@ export credit, standing charges and time-of-use bands (day/night/peak/EV/free wi
 ![Plan ranking dashboard](docs/screenshot.png)
 
 ## How it works
-- A nightly job copies the HDF interval export (`esbn_hdf_latest.csv`, produced by the
-  esbn-to-mqtt Home Assistant add-on) into `data/` and POSTs `/api/ingest`.
+- A nightly job copies the HDF interval export (`esbn_hdf_latest.csv`) into `data/` and POSTs
+  `/api/ingest`. The file comes from [my fork of the esbn-to-mqtt Home Assistant add-on](https://github.com/colfin22/esbn-to-mqtt),
+  which saves a local copy of each HDF download (to `/share/esbn/`) alongside publishing the
+  MQTT sensors — the stock add-on doesn't keep the file. Any other source of an ESB Networks
+  HDF export works too (e.g. the manual download from your ESB online account).
 - The costing engine assigns each half-hour to a plan's rate band by local clock time and
   weekday (interval START time), sums import costs, subtracts export credit, adds the standing
   charge and annualises.
