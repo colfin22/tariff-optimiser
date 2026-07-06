@@ -69,3 +69,6 @@ so the review queue earns its keep.
 
 ## Tests
     python -m pytest tests/
+
+## Licence
+Built by Colm Finn — [MIT licensed](LICENSE).
