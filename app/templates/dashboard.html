@@ -10,8 +10,17 @@
   {% endif %}
 {% endif %}
 
+{% if uploaded %}<p class="dim">Upload: {{ uploaded }}.</p>{% endif %}
+
 {% if not n_readings %}
-<div class="card">No meter data yet — run the ingest (POST /api/ingest) once the HDF file is in /data.</div>
+<div class="card">No meter data yet — upload your HDF file below (download it from the
+ESB Networks portal under "My energy consumption"), or run the automated ingest
+(POST /api/ingest) once the HDF file is in /data.
+<form method="post" action="/upload" enctype="multipart/form-data" style="margin-top:.6em">
+  <input type="file" name="file" accept=".csv" required>
+  <button class="small">Upload HDF CSV</button>
+</form>
+</div>
 {% elif not ranking %}
 <div class="card">No active plans — add some on the <a href="/plans">Plans</a> page.</div>
 {% else %}
@@ -58,5 +67,11 @@
 </div>
 <p class="dim">Based on {{ n_readings }} half-hour readings; latest meter data {{ last_reading }} (ESB uploads lag 3&ndash;4 days &mdash; normal).
 Window: <a href="/?days=90">90d</a> &middot; <a href="/?days=180">180d</a> &middot; <a href="/?days=365">365d</a></p>
+<details><summary class="dim">manually upload an HDF CSV</summary>
+<form method="post" action="/upload" enctype="multipart/form-data" style="margin-top:.6em">
+  <input type="file" name="file" accept=".csv" required>
+  <button class="small">Upload HDF CSV</button>
+</form>
+</details>
 {% endif %}
 {% endblock %}
