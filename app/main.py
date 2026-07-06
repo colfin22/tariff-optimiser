@@ -1,9 +1,10 @@
 import json
 import os
+import shutil
 from datetime import date
 from urllib.parse import quote
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -37,7 +38,7 @@ def health():
 
 
 @app.get("/")
-def dashboard(request: Request, days: int = 365):
+def dashboard(request: Request, days: int = 365, uploaded: str = ""):
     c = conn()
     try:
         freshness = c.execute("SELECT MAX(interval_end) m, COUNT(*) n FROM readings").fetchone()
@@ -49,6 +50,7 @@ def dashboard(request: Request, days: int = 365):
             "ranking": ranking, "days": days, "current": current, "current_id": current_id,
             "last_reading": freshness["m"], "n_readings": freshness["n"],
             "contract_end": end, "days_left": (end - date.today()).days if end else None,
+            "uploaded": uploaded,
         })
     finally:
         c.close()
@@ -254,6 +256,22 @@ def settings_save(current_plan_id: str = Form(""), contract_start: str = Form(""
     finally:
         c.close()
     return RedirectResponse("/settings", status_code=303)
+
+
+@app.post("/upload")
+def upload_hdf(file: UploadFile = File(...)):
+    dest = os.path.join(os.path.dirname(db.DB_PATH), "uploaded_hdf.csv")
+    with open(dest, "wb") as out:
+        shutil.copyfileobj(file.file, out)
+    c = conn()
+    try:
+        r = ingest.ingest_file(c, dest)
+        msg = f"{r['intervals']} intervals ingested; data now spans {r['first']} to {r['last']} ({r['db_rows']} readings)"
+    except Exception as e:  # noqa: BLE001 - surface any parse failure to the user
+        msg = f"upload failed — not a valid ESBN HDF CSV? ({e})"
+    finally:
+        c.close()
+    return RedirectResponse(f"/?uploaded={quote(msg)}", status_code=303)
 
 
 @app.post("/api/ingest")
