@@ -2,6 +2,13 @@
 {% block content %}
 <h1>Tariff plans</h1>
 
+<form class="inline" method="post" action="/plans/scrape"
+      onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Scraping…';">
+  <button class="small">Scrape rates now</button>
+</form>
+<span class="dim">Checks selectra.ie for rate changes (also runs monthly on the 1st).</span>
+{% if scraped %}<p class="dim">Scrape finished: {{ scraped }}.</p>{% endif %}
+
 {% if suggestions %}
 <div class="card" style="border-color: var(--warn)">
   <h2>&#9888; Scraped rate changes awaiting review ({{ suggestions|length }})</h2>

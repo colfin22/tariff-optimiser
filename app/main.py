@@ -1,6 +1,7 @@
 import json
 import os
 from datetime import date
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
@@ -54,7 +55,7 @@ def dashboard(request: Request, days: int = 365):
 
 
 @app.get("/plans")
-def plans_page(request: Request):
+def plans_page(request: Request, scraped: str = ""):
     c = conn()
     try:
         c.executescript(scraper.SCHEMA)
@@ -65,9 +66,23 @@ def plans_page(request: Request):
         suggestions = c.execute("SELECT * FROM suggestions WHERE status='pending' ORDER BY id").fetchall()
         return templates.TemplateResponse(request, "plans.html",
                                           {"plans": plans, "bands": bands, "suggestions": suggestions,
+                                           "scraped": scraped,
                                            "current_id": db.get_setting(c, "current_plan_id")})
     finally:
         c.close()
+
+
+@app.post("/plans/scrape")
+def plans_scrape():
+    c = conn()
+    try:
+        r = scraper.scrape_and_notify(c)
+        msg = f"{r['new_suggestions']} new suggestion(s)"
+        if r["errors"]:
+            msg += "; problems: " + "; ".join(r["errors"])
+    finally:
+        c.close()
+    return RedirectResponse(f"/plans?scraped={quote(msg)}", status_code=303)
 
 
 @app.post("/api/scrape")
