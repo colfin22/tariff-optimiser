@@ -14,6 +14,11 @@ and time windows:
 
 ![Plan editor](docs/plans.png)
 
+The **Settings** tab holds your current plan and contract dates (for the expiry alerts),
+the optional Home Assistant connection for notifications, and the manual HDF upload:
+
+![Settings](docs/settings.png)
+
 ## How it works
 - A nightly job copies the HDF interval export (`esbn_hdf_latest.csv`) into `data/` and POSTs
   `/api/ingest`. The file comes from [my fork of the esbn-to-mqtt Home Assistant add-on](https://github.com/colfin22/esbn-to-mqtt),
