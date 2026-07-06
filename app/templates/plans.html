@@ -4,7 +4,7 @@
 
 <form class="inline" method="post" action="/plans/scrape"
       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Scraping…';">
-  <button class="small">Scrape rates now</button>
+  <button>Scrape rates now</button>
 </form>
 <span class="dim">Checks selectra.ie for rate changes (also runs monthly on the 1st).</span>
 {% if scraped %}<p class="dim">Scrape finished: {{ scraped }}.</p>{% endif %}
