@@ -9,12 +9,13 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import alerts, db, engine, ingest, scraper
+from . import __version__, alerts, db, engine, ingest, scraper
 
-app = FastAPI(title="Irish Tariff Optimiser")
+app = FastAPI(title="Irish Tariff Optimiser", version=__version__)
 BASE = os.path.dirname(__file__)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE, "templates"))
+templates.env.globals["version"] = __version__
 
 DOW_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
