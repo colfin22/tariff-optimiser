@@ -22,6 +22,18 @@
 </form>
 </div>
 <div class="card">
+  <h2>Meter data</h2>
+  {% if uploaded %}<p class="dim">Upload: {{ uploaded }}.</p>{% endif %}
+  <form method="post" action="/upload" enctype="multipart/form-data">
+    <input type="hidden" name="next" value="/settings">
+    <input type="file" name="file" accept=".csv" required>
+    <button class="small">Upload HDF CSV</button>
+  </form>
+  <p class="dim">Manually import an HDF interval export (downloaded from your ESB Networks
+  account). Safe to overlap with the automated nightly ingest &mdash; re-uploaded intervals
+  are updated, not duplicated.</p>
+</div>
+<div class="card">
   <h2>Test notification</h2>
   <form method="post" action="/api/notify/test"><button>Send test push</button></form>
   <p class="dim">Alerts fire automatically at 30 and 7 days before contract end (daily check at 10:00).</p>
