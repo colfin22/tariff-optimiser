@@ -49,7 +49,8 @@ per supplier) monthly, and diffs what it finds against your stored plans. Design
 - **What it can't read:** band *time windows* (peak hours, EV boost windows) aren't published in
   the rate tables — verify those against the supplier's own terms when adding a plan.
 
-Trigger it manually with `curl -X POST localhost:8000/api/scrape`, or on a schedule (this
+Trigger it manually with the **Scrape rates now** button on the Plans page (or
+`curl -X POST localhost:8000/api/scrape`), or on a schedule (this
 deployment uses a systemd timer on the 1st of the month). Worth knowing: on its very first run
 it caught a seeding error in this repo — a rate copied from the rural column instead of urban —
 so the review queue earns its keep.
