@@ -13,9 +13,10 @@
 {% if uploaded %}<p class="dim">Upload: {{ uploaded }}.</p>{% endif %}
 
 {% if not n_readings %}
-<div class="card">No meter data yet — upload your HDF file below (download it from the
-ESB Networks portal under "My energy consumption"), or run the automated ingest
-(POST /api/ingest) once the HDF file is in /data.
+<div class="card">No meter data yet — upload your HDF file below: log in at
+<a href="https://myaccount.esbnetworks.ie" target="_blank" rel="noopener">myaccount.esbnetworks.ie</a>,
+go to <b>My energy consumption</b> and download the <b>30-minute readings in kWh</b> file.
+Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
 <form method="post" action="/upload" enctype="multipart/form-data" style="margin-top:.6em">
   <input type="file" name="file" accept=".csv" required>
   <button class="small">Upload HDF CSV</button>
