@@ -233,13 +233,13 @@ def usage(request: Request, days: int = 365):
 
 
 @app.get("/settings")
-def settings_page(request: Request):
+def settings_page(request: Request, uploaded: str = ""):
     c = conn()
     try:
         plans = c.execute("SELECT id,supplier,name FROM plans WHERE active=1 ORDER BY supplier,name").fetchall()
         s = {k: db.get_setting(c, k) for k in
              ("current_plan_id", "contract_start", "contract_months", "ha_url", "ha_token", "notify_service")}
-        return templates.TemplateResponse(request, "settings.html", {"plans": plans, "s": s})
+        return templates.TemplateResponse(request, "settings.html", {"plans": plans, "s": s, "uploaded": uploaded})
     finally:
         c.close()
 
@@ -260,7 +260,7 @@ def settings_save(current_plan_id: str = Form(""), contract_start: str = Form(""
 
 
 @app.post("/upload")
-def upload_hdf(file: UploadFile = File(...)):
+def upload_hdf(file: UploadFile = File(...), next: str = Form("/")):
     dest = os.path.join(os.path.dirname(db.DB_PATH), "uploaded_hdf.csv")
     with open(dest, "wb") as out:
         shutil.copyfileobj(file.file, out)
@@ -272,7 +272,8 @@ def upload_hdf(file: UploadFile = File(...)):
         msg = f"upload failed — not a valid ESBN HDF CSV? ({e})"
     finally:
         c.close()
-    return RedirectResponse(f"/?uploaded={quote(msg)}", status_code=303)
+    dest_page = next if next in ("/", "/settings") else "/"
+    return RedirectResponse(f"{dest_page}?uploaded={quote(msg)}", status_code=303)
 
 
 @app.post("/api/ingest")
