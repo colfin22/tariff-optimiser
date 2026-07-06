@@ -19,7 +19,8 @@ and time windows:
   `/api/ingest`. The file comes from [my fork of the esbn-to-mqtt Home Assistant add-on](https://github.com/colfin22/esbn-to-mqtt),
   which saves a local copy of each HDF download (to `/share/esbn/`) alongside publishing the
   MQTT sensors — the stock add-on doesn't keep the file. Any other source of an ESB Networks
-  HDF export works too (e.g. the manual download from your ESB online account).
+  HDF export works too: download it manually from your ESB online account and upload it
+  straight from the dashboard.
 - The costing engine assigns each half-hour to a plan's rate band by local clock time and
   weekday (interval START time), sums import costs, subtracts export credit, adds the standing
   charge and annualises.
