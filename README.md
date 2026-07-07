@@ -18,7 +18,9 @@ meter readings — through every plan's real rate bands, credits your export at 
 plan's own microgeneration rate, includes standing charges and signup credits, and
 re-checks supplier rate cards monthly. The ranking is *your house's* ranking, not an
 average household's — and it can honestly tell you that staying put is the best deal,
-which no commission-funded comparison site will.
+which no commission-funded comparison site will. It also links with **Home Assistant** to
+push a phone notification **30 and 7 days before your current contract expires** — the
+ranking lands in front of you exactly when switching is penalty-free.
 
 ![Plan ranking dashboard](docs/screenshot.png)
 
