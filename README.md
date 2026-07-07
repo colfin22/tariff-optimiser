@@ -4,6 +4,12 @@ Self-hosted app that replays your actual ESB Networks half-hourly smart-meter da
 library of Irish electricity tariff plans and ranks them by true annual cost — including solar
 export credit, standing charges and time-of-use bands (day/night/peak/EV/free windows).
 
+Comparison sites take your annual kWh and apply a "typical" usage profile. But with a smart
+meter, solar panels, and time-of-use tariffs, **when** you use electricity matters more than
+how much — a plan with a cheap night rate is brilliant for one house and useless for the
+next. This app skips the estimating and prices every plan against what your meter actually
+recorded.
+
 ![Plan ranking dashboard](docs/screenshot.png)
 
 The **Usage** tab shows where your kWh actually land across the day (the case for a night
