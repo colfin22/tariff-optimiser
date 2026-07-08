@@ -1,5 +1,9 @@
 # Irish Tariff Optimiser
 
+[![CI](https://github.com/colfin22/tariff-optimiser/actions/workflows/ci.yml/badge.svg)](https://github.com/colfin22/tariff-optimiser/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/colfin22/tariff-optimiser)](https://github.com/colfin22/tariff-optimiser/releases)
+[![License: MIT](https://img.shields.io/github/license/colfin22/tariff-optimiser)](LICENSE)
+
 Self-hosted app that replays your actual ESB Networks half-hourly smart-meter data against a
 library of Irish electricity tariff plans and ranks them by true annual cost — including solar
 export credit, standing charges and time-of-use bands (day/night/peak/EV/free windows).
