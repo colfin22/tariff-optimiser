@@ -81,9 +81,15 @@ so the review queue earns its keep.
 
 ## Run
     docker compose up -d --build
-    docker compose exec tariff python -m app.seed   # first run only
-    # put an HDF file at data/esbn_hdf_latest.csv, then:
-    curl -X POST localhost:8000/api/ingest
+
+Supplier plans seed themselves on first boot. Then upload your ESB Networks
+HDF file on the **Settings** page (or drop it at `data/esbn_hdf_latest.csv`
+and `curl -X POST localhost:8000/api/ingest` if you're automating). `/health`
+reports readiness — plan count, readings count, newest reading — and tells
+you what's missing on a fresh install.
+
+Running outside Docker? Python 3.12+ required (the image handles it for you).
+Re-seed plans after editing them: `docker compose exec tariff python -m app.seed --force`.
 
 ## Tests
     python -m pytest tests/

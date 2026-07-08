@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import __version__, alerts, db, engine, ingest, scraper
+from . import __version__, alerts, db, engine, ingest, scraper, seed as seed_mod
 
 app = FastAPI(title="Irish Tariff Optimiser", version=__version__)
 BASE = os.path.dirname(__file__)
@@ -33,9 +33,41 @@ def dow_names(mask: int) -> str:
 templates.env.filters["dow"] = dow_names
 
 
+@app.on_event("startup")
+def auto_seed():
+    """First boot: seed the supplier plans automatically (idempotent) —
+    a manual `python -m app.seed` step was the thing everyone skipped."""
+    c = conn()
+    try:
+        n = seed_mod.seed(c)
+        if n:
+            import logging
+            logging.getLogger(__name__).info("seeded %d supplier plans on first boot", n)
+    finally:
+        c.close()
+
+
 @app.get("/health")
 def health():
-    return {"ok": True}
+    """Liveness AND readiness — can the app actually compare plans yet?"""
+    out = {"ok": True, "version": __version__}
+    try:
+        c = conn()
+        try:
+            out["plans"] = c.execute("SELECT COUNT(*) n FROM plans").fetchone()["n"]
+            r = c.execute("SELECT COUNT(*) n, MAX(interval_end) newest FROM readings").fetchone()
+            out["readings"] = r["n"]
+            out["newest_reading"] = r["newest"]
+        finally:
+            c.close()
+        out["ready"] = out["plans"] > 0 and out["readings"] > 0
+        if not out["ready"]:
+            out["message"] = ("no smart-meter data yet — upload your ESB Networks HDF file "
+                              "on the Settings page (plans seed automatically at startup)")
+    except Exception as e:  # noqa: BLE001 - health must never 500
+        out["ready"] = False
+        out["message"] = f"db not readable: {e}"
+    return out
 
 
 @app.get("/")
