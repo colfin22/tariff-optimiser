@@ -30,7 +30,11 @@ LABEL_MAP = [
 ]
 ROW_RE = re.compile(r"(EV Charge Time|Night Boost|24-Hour|Night|Peak|Day)\s+(\d+\.\d+)\s*c/kWh")
 STANDING_RE = re.compile(r"Standing charge\s*€\s*(\d+\.\d+)\s*/yr")
-EXPORT_RE = re.compile(r"(\d+\.\d+)\s*c/kWh")
+# The export rate lives in the "<provider> microgeneration export rate comparison table …
+# Export rate … Payment method … NN.NN c/kWh" section. Anchor on that phrase, NOT a bare
+# "Microgeneration": Selectra now also renders "Microgeneration rates" as a nav-menu link with
+# no figure after it, and find("Microgeneration") landing there returned export=None silently (#6).
+EXPORT_TABLE_RE = re.compile(r"export rate comparison table.*?(\d+\.\d+)\s*c/kWh", re.I)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS suggestions (
@@ -70,11 +74,9 @@ def parse_page(html_src: str) -> dict:
         if bands:
             plans[name] = {"bands": bands, "standing": float(st.group(1)) if st else None}
     export = None
-    mi = html_src.find("Microgeneration")
-    if mi != -1:
-        me = EXPORT_RE.search(_text(html_src[mi:mi + 4000]))
-        if me:
-            export = round(float(me.group(1)) / 100, 4)  # export quoted rate, no VAT added
+    me = EXPORT_TABLE_RE.search(_text(html_src))
+    if me:
+        export = round(float(me.group(1)) / 100, 4)  # export quoted ex-VAT (payments are); no VAT added
     return {"plans": plans, "export": export}
 
 
@@ -107,6 +109,8 @@ def run_scrape(conn) -> dict:
         if not data["plans"]:
             errors.append(f"{supplier}: parsed 0 plans — page layout may have changed")
             continue
+        if data["export"] is None:  # never let a missing export rate pass silently (#6)
+            errors.append(f"{supplier}: export rate not found — page layout may have changed")
         rows = conn.execute("SELECT * FROM plans WHERE active=1 AND supplier=?", (supplier,)).fetchall()
         by_name = {r["name"]: r for r in rows}
         for pname, scraped in data["plans"].items():

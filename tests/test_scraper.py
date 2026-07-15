@@ -3,8 +3,12 @@ import tempfile
 
 from app import db, scraper
 
-# Condensed from a real selectra.ie rate card (structure identical, values arbitrary)
+# Condensed from a real selectra.ie rate card (structure identical, values arbitrary).
+# Note the "Microgeneration rates" NAV LINK near the top: a bare find("Microgeneration")
+# lands there (no figure) and returns export=None — the real rate is in the comparison
+# table lower down (#6). The fixture keeps the decoy so that regression stays caught.
 FIXTURE = """
+<a class="menu" href="/energy/microgeneration">Microgeneration rates</a>
 <h3 id="offer-acme-standard-24hr" class="x">Standard, 24hr</h3>
 <table><tr><th>Time of use</th><th>Urban</th><th>Rural</th></tr>
 <tr><td>24-Hour</td><td>30.00 c/kWh</td><td>31.00 c/kWh</td></tr>
@@ -21,8 +25,9 @@ FIXTURE = """
 <tr><td>Night Boost</td><td>8.65 c/kWh</td><td>9.00 c/kWh</td></tr></table>
 <h3 id="offer-acme-standard-gas" class="x">Standard Gas</h3>
 <table><tr><td>24-Hour</td><td>9.10 c/kWh</td><td>9.10 c/kWh</td></tr></table>
-<h2>Microgeneration rates</h2>
-<table><tr><td>Rate</td><td>18.50 c/kWh</td><td>Quarterly credit</td></tr></table>
+<h2>Acme microgeneration export rate comparison table</h2>
+<table><tr><th>Export rate</th><th>Payment method</th></tr>
+<tr><td>18.50 c/kWh</td><td>Quarterly credit</td></tr></table>
 """
 
 
@@ -37,7 +42,40 @@ def test_parse_page():
     ev = r["plans"]["EV Smart Drive"]
     assert ev["bands"]["EV boost"] == round(8.65 * 1.09 / 100, 4)  # Night Boost mapped, not Night
     assert "Night" not in ev["bands"]
-    assert r["export"] == 0.185
+    assert r["export"] == 0.185  # read from the comparison table, NOT the "Microgeneration rates" nav link
+
+
+def test_export_ignores_the_nav_link_and_reads_the_table():
+    """#6 — the bug: 'Microgeneration rates' appears first as a nav link with no figure. Anchor
+    on the '… export rate comparison table …' section, or export silently reads None."""
+    html = ('<a href="/energy/microgeneration">Microgeneration rates</a>'
+            '<h3 id="offer-acme-smart">Smart</h3>'
+            '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr></table>'
+            '<h2>Acme microgeneration export rate comparison table</h2>'
+            '<table><tr><td>Export rate</td><td>Payment method</td></tr>'
+            '<tr><td>21.00 c/kWh</td><td>Quarterly credit</td></tr></table>')
+    assert scraper.parse_page(html)["export"] == 0.21
+
+
+def test_missing_export_is_flagged_not_silent(monkeypatch):
+    """#6 — a page that parses plans but no export section must raise an error (-> notification),
+    never swallow it. Uses a page with the nav link but NO comparison table."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Smart',240.0,0.20)")
+        conn.commit()
+        no_export = ('<a href="/energy/microgeneration">Microgeneration rates</a>'
+                     '<h3 id="offer-acme-smart">Smart</h3>'
+                     '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr></table>')
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: no_export)
+        r = scraper.run_scrape(conn)
+        assert any("export rate not found" in e for e in r["errors"])
+    finally:
+        os.unlink(path)
 
 
 def test_suggest_and_apply(monkeypatch):
