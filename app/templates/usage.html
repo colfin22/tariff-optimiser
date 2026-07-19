@@ -13,6 +13,8 @@
 <script>
 const profile = {{ profile|safe }};
 const monthly = {{ monthly|safe }};
+// #8: chart labels show 'Jul 2026', not the raw '2026-07' from the SQL aggregation
+const monthLabel = ym => { const [y, m] = ym.split('-'); return new Date(y, m - 1).toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }); };
 new Chart(document.getElementById('profile'), {
   type: 'bar',
   data: { labels: profile.map(r => r.hm),
@@ -26,7 +28,7 @@ new Chart(document.getElementById('profile'), {
 });
 new Chart(document.getElementById('monthly'), {
   type: 'bar',
-  data: { labels: monthly.map(r => r.ym),
+  data: { labels: monthly.map(r => monthLabel(r.ym)),
     datasets: [
       { label: 'Import kWh', data: monthly.map(r => r.imp), backgroundColor: '#ffa94d' },
       { label: 'Export kWh', data: monthly.map(r => -r.exp), backgroundColor: '#51cf66' },
