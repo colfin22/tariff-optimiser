@@ -84,6 +84,15 @@ it caught a seeding error in this repo — a rate copied from the rural column i
 so the review queue earns its keep.
 
 ## Run
+Pre-built images (amd64 + arm64) are published to
+[Docker Hub](https://hub.docker.com/r/colfin22/tariff-optimiser) and GHCR:
+
+    docker run -d --name tariff-optimiser -p 8000:8000 \
+      -v ./data:/data --restart unless-stopped \
+      colfin22/tariff-optimiser:latest
+
+(or `ghcr.io/colfin22/tariff-optimiser:latest`). To build from source instead:
+
     docker compose up -d --build
 
 Supplier plans seed themselves on first boot. Then upload your ESB Networks
