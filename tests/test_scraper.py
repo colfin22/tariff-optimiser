@@ -110,3 +110,22 @@ def test_suggest_and_apply(monkeypatch):
         assert any("Standard 24hr" in i["detail"] for i in infos)
     finally:
         os.unlink(path)
+
+
+def test_quiet_run_still_notifies(monkeypatch):
+    """#18 — a run with no changes and no errors must still push, so a dead scrape
+    is distinguishable from a quiet week."""
+    from app import alerts
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        sent = []
+        monkeypatch.setattr(scraper, "run_scrape", lambda c: {"new_suggestions": 0, "errors": [], "unmatched": []})
+        monkeypatch.setattr(alerts, "_notify", lambda c, title, msg: sent.append((title, msg)))
+        scraper.scrape_and_notify(conn)
+        assert len(sent) == 1
+        assert "no changes" in sent[0][1]
+    finally:
+        os.unlink(path)

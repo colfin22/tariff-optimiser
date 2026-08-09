@@ -6,7 +6,7 @@
       onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='Scraping…';">
   <button>Scrape rates now</button>
 </form>
-<span class="dim">Checks selectra.ie for rate changes (also runs monthly on the 1st).</span>
+<span class="dim">Checks selectra.ie for rate changes (also runs weekly, Mondays at 09:15).</span>
 {% if scraped %}<p class="dim">Scrape finished: {{ scraped }}.</p>{% endif %}
 
 {% if suggestions %}
@@ -27,7 +27,7 @@
     {% endfor %}
   </table>
   <form class="inline" method="post" action="/suggestions/apply_all"><button>Apply all</button></form>
-  <p class="dim">Rates scraped monthly from selectra.ie (unit rates converted to incl. 9% VAT). Applying also bumps the plan's "rates as of" date. Time windows aren't scraped — verify those in the supplier's terms.</p>
+  <p class="dim">Rates scraped weekly from selectra.ie (unit rates converted to incl. 9% VAT). Applying also bumps the plan's "rates as of" date. Time windows aren't scraped — verify those in the supplier's terms.</p>
 </div>
 {% endif %}
 

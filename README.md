@@ -21,7 +21,7 @@ headline offers on the day you visit.
 **What this app does:** replays your **actual last 365 days** — all 17,500 half-hour
 meter readings — through every plan's real rate bands, credits your export at each
 plan's own microgeneration rate, includes standing charges and signup credits, and
-re-checks supplier rate cards monthly. The ranking is *your house's* ranking, not an
+re-checks supplier rate cards weekly. The ranking is *your house's* ranking, not an
 average household's — and it can honestly tell you that staying put is the best deal,
 which no commission-funded comparison site will. It also links with **Home Assistant** to
 push a phone notification **30 and 7 days before your current contract expires** — the
@@ -55,21 +55,21 @@ the optional Home Assistant connection for notifications, and the manual HDF upl
 - Plans and their rate bands are managed in the UI (`/plans`); seed data for the six main
   suppliers is in `app/seed.py` with an as-of date — rates are entered including VAT.
 - Contract-expiry alerts fire at 30 and 7 days via a Home Assistant notify service (`/settings`).
-- A monthly **scrape-and-suggest** job keeps the rates honest — see below.
+- A weekly **scrape-and-suggest** job keeps the rates honest — see below.
 
 ## Rate scraping
 
 Irish suppliers have no rates API, so `app/scraper.py` checks the per-supplier rate cards on
 [selectra.ie](https://selectra.ie/energy/guides/electricity-prices-ireland) (one structured page
-per supplier) monthly, and diffs what it finds against your stored plans. Design choices:
+per supplier) weekly, and diffs what it finds against your stored plans. Design choices:
 
 - **Suggest, never auto-apply.** Differences are queued as suggestions on the Plans page with
   per-item Apply/Dismiss and an Apply-all. A parsing glitch can't silently corrupt the ranking
   you'll make a switching decision on. Applying a suggestion also bumps the plan's
   "rates as of" date.
-- **Fail loudly.** If a page fetch fails or parses to zero plans (layout change), you get a
-  Home Assistant notification rather than quietly stale rates — same channel as when it finds
-  genuine changes.
+- **Always reports.** Every run sends a Home Assistant notification: the changes it found, any
+  page fetch or parse failure (layout change), or a short "no changes found" line. A scraper that
+  has quietly stopped working can't be mistaken for a quiet week.
 - **Sticky dismissals.** A dismissed value won't be re-suggested; a further change to that rate
   will be.
 - **What it reads:** urban unit rates per band (converted to include 9% VAT — Selectra quotes
@@ -80,7 +80,7 @@ per supplier) monthly, and diffs what it finds against your stored plans. Design
 
 Trigger it manually with the **Scrape rates now** button on the Plans page (or
 `curl -X POST localhost:8000/api/scrape`), or on a schedule (this
-deployment uses a systemd timer on the 1st of the month). Worth knowing: on its very first run
+deployment uses a weekly systemd timer, Mondays at 09:15). Worth knowing: on its very first run
 it caught a seeding error in this repo — a rate copied from the rural column instead of urban —
 so the review queue earns its keep.
 

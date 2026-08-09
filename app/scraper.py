@@ -20,7 +20,7 @@ PAGES = {
     "Flogas": "https://selectra.ie/energy/providers/flogas/rates",
     "Pinergy": "https://selectra.ie/energy/providers/pinergy/rates",
 }
-UA = "Mozilla/5.0 (X11; Linux x86_64) tariff-optimiser/1.0 (personal rate check, monthly)"
+UA = "Mozilla/5.0 (X11; Linux x86_64) tariff-optimiser/1.0 (personal rate check, weekly)"
 VAT = 1.09
 
 # Selectra row label -> our band label. Longest-first so 'Night Boost' wins over 'Night'.
@@ -155,14 +155,15 @@ def apply_suggestion(conn, sid: int) -> bool:
 def scrape_and_notify(conn) -> dict:
     from . import alerts
     r = run_scrape(conn)
-    if r["new_suggestions"] or r["errors"]:
-        parts = []
-        if r["new_suggestions"]:
-            parts.append(f"{r['new_suggestions']} rate change(s) found — review on the Plans page.")
-        if r["errors"]:
-            parts.append("Scrape problems: " + "; ".join(r["errors"]))
-        try:
-            alerts._notify(conn, "Tariff rates", " ".join(parts))
-        except Exception:  # noqa: BLE001 - notification failure shouldn't fail the scrape
-            pass
+    parts = []
+    if r["new_suggestions"]:
+        parts.append(f"{r['new_suggestions']} rate change(s) found — review on the Plans page.")
+    if r["errors"]:
+        parts.append("Scrape problems: " + "; ".join(r["errors"]))
+    if not parts:  # #18 - always report, so a dead scrape can't look like a quiet week
+        parts.append("Weekly rate scrape ran, no changes found.")
+    try:
+        alerts._notify(conn, "Tariff rates", " ".join(parts))
+    except Exception:  # noqa: BLE001 - notification failure shouldn't fail the scrape
+        pass
     return r
