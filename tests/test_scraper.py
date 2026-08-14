@@ -7,6 +7,8 @@ from app import db, scraper
 # Note the "Microgeneration rates" NAV LINK near the top: a bare find("Microgeneration")
 # lands there (no figure) and returns export=None — the real rate is in the comparison
 # table lower down (#6). The fixture keeps the decoy so that regression stays caught.
+# It also keeps an all-zero "Activ8" block: Selectra lists some plans with no figures published
+# yet, and parsing one as a real plan queued a permanent untracked-plan suggestion (#19).
 FIXTURE = """
 <a class="menu" href="/energy/microgeneration">Microgeneration rates</a>
 <h3 id="offer-acme-standard-24hr" class="x">Standard, 24hr</h3>
@@ -25,6 +27,9 @@ FIXTURE = """
 <tr><td>Night Boost</td><td>8.65 c/kWh</td><td>9.00 c/kWh</td></tr></table>
 <h3 id="offer-acme-standard-gas" class="x">Standard Gas</h3>
 <table><tr><td>24-Hour</td><td>9.10 c/kWh</td><td>9.10 c/kWh</td></tr></table>
+<h3 id="offer-acme-activ8" class="x">Activ8</h3>
+<table><tr><td>24-Hour</td><td>0.00 c/kWh</td><td>0.00 c/kWh</td></tr>
+<tr><td>Standing charge</td><td>&euro;0.00/yr</td><td>&euro;0.00/yr</td></tr></table>
 <h2>Acme microgeneration export rate comparison table</h2>
 <table><tr><th>Export rate</th><th>Payment method</th></tr>
 <tr><td>18.50 c/kWh</td><td>Quarterly credit</td></tr></table>
@@ -33,7 +38,8 @@ FIXTURE = """
 
 def test_parse_page():
     r = scraper.parse_page(FIXTURE)
-    assert set(r["plans"]) == {"Standard 24hr", "Smart Electricity", "EV Smart Drive"}  # gas skipped, comma stripped
+    # gas skipped, all-zero Activ8 skipped, comma stripped
+    assert set(r["plans"]) == {"Standard 24hr", "Smart Electricity", "EV Smart Drive"}
     flat = r["plans"]["Standard 24hr"]
     assert flat["bands"] == {"All hours": round(30.00 * 1.09 / 100, 4)}
     assert flat["standing"] == 250.00  # urban column
@@ -43,6 +49,18 @@ def test_parse_page():
     assert ev["bands"]["EV boost"] == round(8.65 * 1.09 / 100, 4)  # Night Boost mapped, not Night
     assert "Night" not in ev["bands"]
     assert r["export"] == 0.185  # read from the comparison table, NOT the "Microgeneration rates" nav link
+
+
+def test_placeholder_zero_rate_plan_is_skipped():
+    """#19 — Selectra listed SSE Airtricity 'Activ8' with 0.00 c/kWh everywhere. Parsing it as a
+    real plan queued an untracked-plan suggestion on every scrape, and adding it by hand off the
+    back of that would have seeded a EUR 0/yr plan that instantly wins the ranking."""
+    assert "Activ8" not in scraper.parse_page(FIXTURE)["plans"]
+    # A single zero band is legitimate (free-hours plans), so only an ALL-zero block is dropped.
+    free = ('<h3 id="offer-acme-free-time">Free Time</h3>'
+            '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr>'
+            '<tr><td>Night</td><td>0.00 c/kWh</td></tr></table>')
+    assert scraper.parse_page(free)["plans"]["Free Time"]["bands"]["Night"] == 0.0
 
 
 def test_export_ignores_the_nav_link_and_reads_the_table():

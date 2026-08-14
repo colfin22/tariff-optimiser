@@ -71,7 +71,10 @@ def parse_page(html_src: str) -> dict:
             ours = next(o for s, o in LABEL_MAP if s == label)
             bands.setdefault(ours, round(float(val) * VAT / 100, 4))  # first hit = urban
         st = STANDING_RE.search(txt)
-        if bands:
+        # Selectra lists some plans with no rates published yet (SSE 'Activ8': 0.00 c/kWh in every
+        # column). Treating those as real plans queued a permanent untracked-plan suggestion (#19).
+        # Only an ALL-zero block is dropped — one zero band is legitimate on a free-hours plan.
+        if bands and any(r > 0 for r in bands.values()):
             plans[name] = {"bands": bands, "standing": float(st.group(1)) if st else None}
     export = None
     me = EXPORT_TABLE_RE.search(_text(html_src))
