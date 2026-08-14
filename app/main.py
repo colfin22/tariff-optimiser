@@ -98,10 +98,13 @@ def plans_page(request: Request, scraped: str = ""):
         bands = {}
         for b in c.execute("SELECT * FROM rate_bands ORDER BY plan_id, priority DESC, start_time"):
             bands.setdefault(b["plan_id"], []).append(b)
-        suggestions = c.execute("SELECT * FROM suggestions WHERE status='pending' ORDER BY id").fetchall()
+        rows = c.execute("SELECT * FROM suggestions WHERE status='pending' ORDER BY id").fetchall()
+        # A NULL plan_id is informational — nothing to apply, so it gets its own card (#20).
+        suggestions = [s for s in rows if s["plan_id"] is not None]
+        notices = [s for s in rows if s["plan_id"] is None]
         return templates.TemplateResponse(request, "plans.html",
                                           {"plans": plans, "bands": bands, "suggestions": suggestions,
-                                           "scraped": scraped,
+                                           "notices": notices, "scraped": scraped,
                                            "current_id": db.get_setting(c, "current_plan_id")})
     finally:
         c.close()
@@ -112,7 +115,7 @@ def plans_scrape():
     c = conn()
     try:
         r = scraper.scrape_and_notify(c)
-        msg = f"{r['new_suggestions']} new suggestion(s)"
+        msg = f"{r['new_suggestions']} rate change(s), {r['new_notices']} notice(s)"
         if r["errors"]:
             msg += "; problems: " + "; ".join(r["errors"])
     finally:

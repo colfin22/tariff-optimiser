@@ -20,7 +20,7 @@
       <td class="cost">{{ s.current if s.current is not none else '' }}</td>
       <td class="cost">{{ s.suggested if s.suggested is not none else '' }}</td>
       <td>
-        {% if s.plan_id %}<form class="inline" method="post" action="/suggestions/{{ s.id }}/apply"><button class="small">Apply</button></form>{% endif %}
+        <form class="inline" method="post" action="/suggestions/{{ s.id }}/apply"><button class="small">Apply</button></form>
         <form class="inline" method="post" action="/suggestions/{{ s.id }}/dismiss"><button class="small danger">Dismiss</button></form>
       </td>
     </tr>
@@ -28,6 +28,21 @@
   </table>
   <form class="inline" method="post" action="/suggestions/apply_all"><button>Apply all</button></form>
   <p class="dim">Rates scraped weekly from selectra.ie (unit rates converted to incl. 9% VAT). Applying also bumps the plan's "rates as of" date. Time windows aren't scraped — verify those in the supplier's terms.</p>
+</div>
+{% endif %}
+
+{% if notices %}
+<div class="card">
+  <h2>Notices from the rate scrape ({{ notices|length }})</h2>
+  <table>
+    {% for s in notices %}
+    <tr>
+      <td>{{ s.detail }}</td>
+      <td><form class="inline" method="post" action="/suggestions/{{ s.id }}/dismiss"><button class="small danger">Dismiss</button></form></td>
+    </tr>
+    {% endfor %}
+  </table>
+  <p class="dim">Information only — there is nothing to apply. The scraper reads rates but not band time windows, so it can't add or change a plan on its own. To start tracking a plan, add it under <a href="#new-plan">New plan</a> below and then give it rate bands.</p>
 </div>
 {% endif %}
 
@@ -84,7 +99,7 @@
 </div>
 {% endfor %}
 
-<div class="card">
+<div class="card" id="new-plan">
   <h2>New plan</h2>
   <form method="post" action="/plans/new">
     <div class="formrow">

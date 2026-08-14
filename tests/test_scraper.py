@@ -130,6 +130,28 @@ def test_suggest_and_apply(monkeypatch):
         os.unlink(path)
 
 
+def test_notices_are_counted_separately_from_rate_changes(monkeypatch):
+    """#20 — an info notice (plan_id NULL) has no Apply button by design, so counting it as a
+    'rate change' sends you to a row you cannot act on. The two counts must be separate."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        # Tracked with a stale Day rate -> 1 real change. The fixture's other plans are untracked.
+        cur = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Smart Electricity',244.76,0.185)")
+        conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                     (cur.lastrowid, "Day", 0.3500, "08:00", "23:00"))
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
+        r = scraper.run_scrape(conn)
+        assert r["new_suggestions"] == 1                    # band:Day only
+        assert r["new_notices"] == len(r["unmatched"]) == 2  # Standard 24hr, EV Smart Drive
+    finally:
+        os.unlink(path)
+
+
 def test_quiet_run_still_notifies(monkeypatch):
     """#18 — a run with no changes and no errors must still push, so a dead scrape
     is distinguishable from a quiet week."""
@@ -140,7 +162,8 @@ def test_quiet_run_still_notifies(monkeypatch):
     try:
         conn.executescript(scraper.SCHEMA)
         sent = []
-        monkeypatch.setattr(scraper, "run_scrape", lambda c: {"new_suggestions": 0, "errors": [], "unmatched": []})
+        monkeypatch.setattr(scraper, "run_scrape",
+                            lambda c: {"new_suggestions": 0, "new_notices": 0, "errors": [], "unmatched": []})
         monkeypatch.setattr(alerts, "_notify", lambda c, title, msg: sent.append((title, msg)))
         scraper.scrape_and_notify(conn)
         assert len(sent) == 1

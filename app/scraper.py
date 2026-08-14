@@ -102,7 +102,8 @@ def _suggest(conn, plan_id, field, current, suggested, detail):
 
 def run_scrape(conn) -> dict:
     conn.executescript(SCHEMA)
-    new, errors, unmatched = 0, [], []
+    # Rate changes and notices are counted apart: a notice has no Apply button by design (#20).
+    new, notices, errors, unmatched = 0, 0, [], []
     for supplier, url in PAGES.items():
         try:
             data = parse_page(fetch(url))
@@ -133,9 +134,9 @@ def run_scrape(conn) -> dict:
                 new += _suggest(conn, plan["id"], "export", plan["export_rate"], data["export"],
                                 f"{supplier} {pname} export rate")
     for u in unmatched:
-        new += _suggest(conn, None, "info", None, None, f"Plan on Selectra but not tracked here: {u}")
+        notices += _suggest(conn, None, "info", None, None, f"Plan on Selectra but not tracked here: {u}")
     conn.commit()
-    return {"new_suggestions": new, "errors": errors, "unmatched": unmatched}
+    return {"new_suggestions": new, "new_notices": notices, "errors": errors, "unmatched": unmatched}
 
 
 def apply_suggestion(conn, sid: int) -> bool:
@@ -161,6 +162,8 @@ def scrape_and_notify(conn) -> dict:
     parts = []
     if r["new_suggestions"]:
         parts.append(f"{r['new_suggestions']} rate change(s) found — review on the Plans page.")
+    if r["new_notices"]:  # #20 - a notice is information, not something to apply
+        parts.append(f"{r['new_notices']} notice(s) from the scrape.")
     if r["errors"]:
         parts.append("Scrape problems: " + "; ".join(r["errors"]))
     if not parts:  # #18 - always report, so a dead scrape can't look like a quiet week
