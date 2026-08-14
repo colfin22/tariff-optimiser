@@ -152,6 +152,53 @@ def test_notices_are_counted_separately_from_rate_changes(monkeypatch):
         os.unlink(path)
 
 
+def _scratch_db():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    return db.connect(path), path
+
+
+def test_withdrawn_plan_is_flagged(monkeypatch):
+    """#21 — the comparison used to run one way only, so a plan pulled from Selectra kept its
+    last-known rates and kept competing in the ranking forever, silently."""
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Legacy Saver',240.0,0.185)")
+        # Deactivated and also absent: already dealt with, must stay quiet.
+        conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,active) VALUES('Acme','Old Retired',240.0,0.185,0)")
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
+        scraper.run_scrape(conn)
+        details = [r["detail"] for r in conn.execute("SELECT detail FROM suggestions WHERE field='info'")]
+        assert any("no longer listed" in d and "Legacy Saver" in d for d in details)
+        assert not any("Old Retired" in d for d in details)
+        # A notice never deactivates a plan — that stays a human decision.
+        assert conn.execute("SELECT active FROM plans WHERE name='Legacy Saver'").fetchone()["active"] == 1
+    finally:
+        os.unlink(path)
+
+
+def test_failed_page_does_not_flag_everything_withdrawn(monkeypatch):
+    """#21 guard — a Selectra redesign that parses 0 plans must not mass-flag a supplier's whole
+    catalogue as withdrawn. The error path has to win before the reverse diff runs."""
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        for n in ("Smart Electricity", "Standard 24hr", "EV Smart Drive"):
+            conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme',?,240.0,0.185)", (n,))
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: "<html><body>nothing here</body></html>")
+        r = scraper.run_scrape(conn)
+        assert any("parsed 0 plans" in e for e in r["errors"])
+        assert r["new_notices"] == 0
+        assert conn.execute("SELECT COUNT(*) n FROM suggestions").fetchone()["n"] == 0
+    finally:
+        os.unlink(path)
+
+
 def test_quiet_run_still_notifies(monkeypatch):
     """#18 — a run with no changes and no errors must still push, so a dead scrape
     is distinguishable from a quiet week."""

@@ -103,7 +103,7 @@ def _suggest(conn, plan_id, field, current, suggested, detail):
 def run_scrape(conn) -> dict:
     conn.executescript(SCHEMA)
     # Rate changes and notices are counted apart: a notice has no Apply button by design (#20).
-    new, notices, errors, unmatched = 0, 0, [], []
+    new, notices, errors, unmatched, withdrawn = 0, 0, [], [], []
     for supplier, url in PAGES.items():
         try:
             data = parse_page(fetch(url))
@@ -133,10 +133,20 @@ def run_scrape(conn) -> dict:
             if data["export"] is not None and abs(plan["export_rate"] - data["export"]) > 0.00005:
                 new += _suggest(conn, plan["id"], "export", plan["export_rate"], data["export"],
                                 f"{supplier} {pname} export rate")
+        # #21 - and the other way: a tracked plan that has vanished from the page. Without this the
+        # comparison ran one way only, so a withdrawn plan kept its last-known rates and kept
+        # competing in the ranking forever. Reached only on a page that parsed (the error paths
+        # above continue first), so a Selectra redesign can't mass-flag a supplier's catalogue.
+        withdrawn += [f"{supplier} {n}" for n in by_name if n not in data["plans"]]
     for u in unmatched:
         notices += _suggest(conn, None, "info", None, None, f"Plan on Selectra but not tracked here: {u}")
+    for w in withdrawn:
+        # "listed" not "offered": a plan whose rates go all-zero is dropped by parse_page (#19) and
+        # lands here too, and only "listed" is true in both cases. Never auto-deactivates.
+        notices += _suggest(conn, None, "info", None, None, f"Tracked plan no longer listed on Selectra: {w}")
     conn.commit()
-    return {"new_suggestions": new, "new_notices": notices, "errors": errors, "unmatched": unmatched}
+    return {"new_suggestions": new, "new_notices": notices, "errors": errors,
+            "unmatched": unmatched, "withdrawn": withdrawn}
 
 
 def apply_suggestion(conn, sid: int) -> bool:
