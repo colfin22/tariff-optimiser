@@ -42,7 +42,6 @@ class Plan:
     signup_credit: float = 0.0
     bands: list[Band] = field(default_factory=list)
     id: int = 0
-    fuel_type: str = "electricity"
 
     def band_for(self, t: datetime) -> Band:
         best = None
@@ -107,8 +106,7 @@ def load_plans(conn, active_only: bool = True) -> list[Plan]:
                  for b in conn.execute("SELECT * FROM rate_bands WHERE plan_id=?", (p["id"],))]
         plans.append(Plan(supplier=p["supplier"], name=p["name"],
                           standing_charge_annual=p["standing_charge_annual"], export_rate=p["export_rate"],
-                          signup_credit=p["signup_credit"], bands=bands, id=p["id"],
-                          fuel_type=p["fuel_type"]))
+                          signup_credit=p["signup_credit"], bands=bands, id=p["id"]))
     return plans
 
 
@@ -128,8 +126,7 @@ def rank_plans(conn, days: int = 365) -> list[dict]:
             r = cost_plan(plan, readings)
         except PlanCoverageError as e:
             r = {"error": str(e)}
-        r.update({"plan_id": plan.id, "supplier": plan.supplier, "name": plan.name,
-                  "fuel_type": plan.fuel_type})
+        r.update({"plan_id": plan.id, "supplier": plan.supplier, "name": plan.name})
         results.append(r)
     results.sort(key=lambda r: r.get("annual_year1", float("inf")))
     return results

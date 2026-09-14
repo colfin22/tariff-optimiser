@@ -308,36 +308,3 @@ def test_scraper_broken_prefixes_critical_in_the_push(monkeypatch):
         assert sent[0][1].startswith("CRITICAL")
     finally:
         os.unlink(path)
-
-
-DUAL_FIXTURE = FIXTURE + """
-<p><strong>Smart Dual Fuel</strong></p>
-<table><tr><td>24-Hour</td><td>28.00 c/kWh</td><td>29.00 c/kWh</td></tr>
-<tr><td>Standing charge</td><td>&euro;260.00/yr</td><td>&euro;290.00/yr</td></tr></table>
-"""
-
-
-def test_dual_fuel_plan_is_auto_added_as_a_real_row_not_a_notice(monkeypatch):
-    """Colm doesn't have dual fuel and wants these visible as badged rows in the ranked plan
-    table (not costable — Selectra never publishes band time windows — but listed), rather than
-    a dismissible info notice he can lose track of."""
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    conn = db.connect(path)
-    try:
-        conn.executescript(scraper.SCHEMA)
-        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
-        monkeypatch.setattr(scraper, "fetch", lambda url: DUAL_FIXTURE)
-        r = scraper.run_scrape(conn)
-        assert "Acme Smart Dual Fuel" not in r["unmatched"]
-        row = conn.execute("SELECT * FROM plans WHERE name='Smart Dual Fuel'").fetchone()
-        assert row is not None
-        assert row["fuel_type"] == "dual"
-        assert row["active"] == 1
-        assert row["standing_charge_annual"] == 260.0
-        assert conn.execute("SELECT COUNT(*) c FROM rate_bands WHERE plan_id=?", (row["id"],)).fetchone()["c"] == 0
-        # a repeat scrape does not duplicate it
-        r2 = scraper.run_scrape(conn)
-        assert conn.execute("SELECT COUNT(*) c FROM plans WHERE name='Smart Dual Fuel'").fetchone()["c"] == 1
-    finally:
-        os.unlink(path)

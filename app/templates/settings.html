@@ -18,12 +18,6 @@
     <label>HA token <input name="ha_token" type="password" placeholder="{% if s.ha_token %}(saved — blank keeps it){% else %}long-lived token{% endif %}" size="30"></label>
     <label>Notify service <input name="notify_service" value="{{ s.notify_service or 'mobile_app_np3' }}" size="20"></label>
   </div>
-  <div class="formrow">
-    <label style="flex-direction:row; align-items:center; gap:0.4rem;">
-      <input type="checkbox" name="show_dual_fuel" value="1" {% if s.show_dual_fuel != '0' %}checked{% endif %}>
-      Show dual-fuel plans in the plan table
-    </label>
-  </div>
   <button>Save</button>
 </form>
 </div>
