@@ -146,6 +146,11 @@ def suggestion_apply(sid: int):
 def suggestion_dismiss(sid: int):
     c = conn()
     try:
+        # Dual Fuel notices are a permanent reference list (Colm doesn't have dual fuel, so
+        # they never apply to him) — they stay visible and marked, never dismissible.
+        row = c.execute("SELECT detail FROM suggestions WHERE id=?", (sid,)).fetchone()
+        if row and "dual" in row["detail"].lower():
+            return RedirectResponse("/plans", status_code=303)
         c.execute("UPDATE suggestions SET status='dismissed' WHERE id=?", (sid,))
         c.commit()
     finally:
