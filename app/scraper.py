@@ -131,9 +131,8 @@ def run_scrape(conn) -> dict:
             if plan is None:
                 if "dual" in pname.lower():
                     # Dual-fuel plans aren't costable (Selectra doesn't publish band time
-                    # windows) but Colm wants them visible in the ranked table with a badge
-                    # rather than buried as a dismissible notice, since he doesn't have dual
-                    # fuel and wants to see at a glance which plans to skip.
+                    # windows), so track them as a real (uncosted) row shown with a badge
+                    # in the ranked table instead of a dismissible notice.
                     exists = conn.execute(
                         "SELECT 1 FROM plans WHERE supplier=? AND name=?", (supplier, pname)).fetchone()
                     if not exists:

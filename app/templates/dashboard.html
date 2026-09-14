@@ -38,7 +38,7 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
     {% if r.fuel_type == "dual" %}<span class="badge">Dual Fuel</span>{% endif %}
   </td>
   {% if r.fuel_type == "dual" %}
-  <td colspan="3" class="dim">not applicable — you don't have dual fuel</td>
+  <td colspan="3" class="dim">not costed — bundled dual-fuel rate, no published band times</td>
   {% elif r.error %}
   <td colspan="3" class="bad">{{ r.error }}</td>
   {% else %}
