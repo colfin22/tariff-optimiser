@@ -79,11 +79,16 @@ def dashboard(request: Request, days: int = 365, uploaded: str = ""):
         current_id = db.get_setting(c, "current_plan_id")
         current = next((r for r in ranking if str(r.get("plan_id")) == current_id), None)
         end = alerts.contract_end(c)
+        c.executescript(scraper.SCHEMA)
+        dual_fuel = c.execute(
+            "SELECT detail FROM suggestions WHERE field='info' AND status='pending' "
+            "AND lower(detail) LIKE '%dual%' ORDER BY detail"
+        ).fetchall()
         return templates.TemplateResponse(request, "dashboard.html", {
             "ranking": ranking, "days": days, "current": current, "current_id": current_id,
             "last_reading": freshness["m"], "n_readings": freshness["n"],
             "contract_end": end, "days_left": (end - date.today()).days if end else None,
-            "uploaded": uploaded,
+            "uploaded": uploaded, "dual_fuel": dual_fuel,
         })
     finally:
         c.close()

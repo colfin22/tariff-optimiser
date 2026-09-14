@@ -69,4 +69,16 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
 <p class="dim">Based on {{ n_readings }} half-hour readings; latest meter data {{ last_reading }} (ESB uploads lag 3&ndash;4 days &mdash; normal).
 Window: <a href="/?days=90">90d</a> &middot; <a href="/?days=180">180d</a> &middot; <a href="/?days=365">365d</a></p>
 {% endif %}
+
+{% if dual_fuel %}
+<div class="card">
+  <h2>Dual Fuel plans on Selectra <span class="badge">not applicable — you don't have dual fuel</span></h2>
+  <p class="dim">Seen on suppliers' rate pages but never tracked or ranked here.</p>
+  <ul>
+  {% for d in dual_fuel %}
+    <li>{{ d.detail.split(': ', 1)[1] if ': ' in d.detail else d.detail }}</li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% endblock %}
