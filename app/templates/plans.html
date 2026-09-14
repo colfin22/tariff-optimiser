@@ -42,7 +42,7 @@
   <table>
     {% for s in notices %}
     <tr>
-      <td>{{ s.detail }}</td>
+      <td>{{ s.detail }}{% if "dual" in s.detail.lower() %} <span class="badge">Dual Fuel</span>{% endif %}</td>
       <td><form class="inline" method="post" action="/suggestions/{{ s.id }}/dismiss"><button class="small danger">Dismiss</button></form></td>
     </tr>
     {% endfor %}
