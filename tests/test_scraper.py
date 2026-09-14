@@ -159,8 +159,9 @@ def _scratch_db():
 
 
 def test_withdrawn_plan_is_flagged(monkeypatch):
-    """#21 — the comparison used to run one way only, so a plan pulled from Selectra kept its
-    last-known rates and kept competing in the ranking forever, silently."""
+    """#21/#24 — the comparison used to run one way only, so a plan pulled from Selectra kept its
+    last-known rates and kept competing in the ranking forever, silently. Now it queues an
+    actionable 'deactivate' suggestion (not just an info notice)."""
     conn, path = _scratch_db()
     try:
         conn.executescript(scraper.SCHEMA)
@@ -171,11 +172,47 @@ def test_withdrawn_plan_is_flagged(monkeypatch):
         monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
         monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
         scraper.run_scrape(conn)
-        details = [r["detail"] for r in conn.execute("SELECT detail FROM suggestions WHERE field='info'")]
-        assert any("no longer listed" in d and "Legacy Saver" in d for d in details)
-        assert not any("Old Retired" in d for d in details)
-        # A notice never deactivates a plan — that stays a human decision.
+        rows = conn.execute("SELECT * FROM suggestions WHERE field='deactivate'").fetchall()
+        assert len(rows) == 1
+        assert "Legacy Saver" in rows[0]["detail"] and "no longer listed" in rows[0]["detail"]
+        assert rows[0]["plan_id"] == conn.execute("SELECT id FROM plans WHERE name='Legacy Saver'").fetchone()["id"]
+        # Never auto-applied — the plan stays active until a human applies the suggestion.
         assert conn.execute("SELECT active FROM plans WHERE name='Legacy Saver'").fetchone()["active"] == 1
+    finally:
+        os.unlink(path)
+
+
+def test_withdrawn_plan_deactivate_suggestion_not_requeued(monkeypatch):
+    """Re-scraping while the suggestion is still pending must not queue a second one."""
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Legacy Saver',240.0,0.185)")
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
+        scraper.run_scrape(conn)
+        scraper.run_scrape(conn)
+        rows = conn.execute("SELECT * FROM suggestions WHERE field='deactivate'").fetchall()
+        assert len(rows) == 1
+    finally:
+        os.unlink(path)
+
+
+def test_apply_deactivate_suggestion_sets_plan_inactive(monkeypatch):
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Legacy Saver',240.0,0.185)")
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
+        scraper.run_scrape(conn)
+        sid = conn.execute("SELECT id FROM suggestions WHERE field='deactivate'").fetchone()["id"]
+        assert scraper.apply_suggestion(conn, sid) is True
+        plan = conn.execute("SELECT active FROM plans WHERE name='Legacy Saver'").fetchone()
+        assert plan["active"] == 0
+        assert conn.execute("SELECT status FROM suggestions WHERE id=?", (sid,)).fetchone()["status"] == "applied"
     finally:
         os.unlink(path)
 

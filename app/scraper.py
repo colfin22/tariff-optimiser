@@ -137,13 +137,18 @@ def run_scrape(conn) -> dict:
         # comparison ran one way only, so a withdrawn plan kept its last-known rates and kept
         # competing in the ranking forever. Reached only on a page that parsed (the error paths
         # above continue first), so a Selectra redesign can't mass-flag a supplier's catalogue.
-        withdrawn += [f"{supplier} {n}" for n in by_name if n not in data["plans"]]
+        for n, plan in by_name.items():
+            if n not in data["plans"] and plan["active"]:
+                withdrawn.append((supplier, n, plan["id"]))
     for u in unmatched:
         notices += _suggest(conn, None, "info", None, None, f"Plan on Selectra but not tracked here: {u}")
-    for w in withdrawn:
-        # "listed" not "offered": a plan whose rates go all-zero is dropped by parse_page (#19) and
-        # lands here too, and only "listed" is true in both cases. Never auto-deactivates.
-        notices += _suggest(conn, None, "info", None, None, f"Tracked plan no longer listed on Selectra: {w}")
+    for supplier, n, plan_id in withdrawn:
+        # #24 - the plain info notice (#21) told a human but never offered anything to act on, so a
+        # withdrawn plan stayed active and kept competing in the ranking forever. Queue an actual
+        # actionable suggestion instead — same apply/dismiss/dedupe flow as a rate change, still
+        # never auto-applied.
+        new += _suggest(conn, plan_id, "deactivate", 1, 0,
+                        f"{supplier} {n} no longer listed on Selectra — deactivate?")
     conn.commit()
     return {"new_suggestions": new, "new_notices": notices, "errors": errors,
             "unmatched": unmatched, "withdrawn": withdrawn}
@@ -160,7 +165,11 @@ def apply_suggestion(conn, sid: int) -> bool:
         conn.execute("UPDATE plans SET standing_charge_annual=? WHERE id=?", (s["suggested"], s["plan_id"]))
     elif s["field"] == "export":
         conn.execute("UPDATE plans SET export_rate=? WHERE id=?", (s["suggested"], s["plan_id"]))
-    conn.execute("UPDATE plans SET rates_as_of=? WHERE id=?", (date.today().isoformat(), s["plan_id"]))
+    elif s["field"] == "deactivate":
+        # No rates_as_of bump below — the plan's rates aren't what changed.
+        conn.execute("UPDATE plans SET active=0 WHERE id=?", (s["plan_id"],))
+    if s["field"] != "deactivate":
+        conn.execute("UPDATE plans SET rates_as_of=? WHERE id=?", (date.today().isoformat(), s["plan_id"]))
     conn.execute("UPDATE suggestions SET status='applied' WHERE id=?", (sid,))
     conn.commit()
     return True

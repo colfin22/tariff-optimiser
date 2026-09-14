@@ -17,8 +17,13 @@
     {% for s in suggestions %}
     <tr>
       <td>{{ s.detail }}</td>
+      {% if s.field == 'deactivate' %}
+      <td class="cost">active</td>
+      <td class="cost">inactive</td>
+      {% else %}
       <td class="cost">{{ s.current if s.current is not none else '' }}</td>
       <td class="cost">{{ s.suggested if s.suggested is not none else '' }}</td>
+      {% endif %}
       <td>
         <form class="inline" method="post" action="/suggestions/{{ s.id }}/apply"><button class="small">Apply</button></form>
         <form class="inline" method="post" action="/suggestions/{{ s.id }}/dismiss"><button class="small danger">Dismiss</button></form>
