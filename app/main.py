@@ -76,6 +76,8 @@ def dashboard(request: Request, days: int = 365, uploaded: str = ""):
     try:
         freshness = c.execute("SELECT MAX(interval_end) m, COUNT(*) n FROM readings").fetchone()
         ranking = engine.rank_plans(c, days) if freshness["n"] else []
+        if db.get_setting(c, "show_dual_fuel", "1") != "1":
+            ranking = [r for r in ranking if r.get("fuel_type") != "dual"]
         current_id = db.get_setting(c, "current_plan_id")
         current = next((r for r in ranking if str(r.get("plan_id")) == current_id), None)
         end = alerts.contract_end(c)
@@ -274,6 +276,7 @@ def settings_page(request: Request, uploaded: str = ""):
         plans = c.execute("SELECT id,supplier,name FROM plans WHERE active=1 ORDER BY supplier,name").fetchall()
         s = {k: db.get_setting(c, k) for k in
              ("current_plan_id", "contract_start", "contract_months", "ha_url", "ha_token", "notify_service")}
+        s["show_dual_fuel"] = db.get_setting(c, "show_dual_fuel", "1")
         return templates.TemplateResponse(request, "settings.html", {"plans": plans, "s": s, "uploaded": uploaded})
     finally:
         c.close()
@@ -281,11 +284,13 @@ def settings_page(request: Request, uploaded: str = ""):
 
 @app.post("/settings")
 def settings_save(current_plan_id: str = Form(""), contract_start: str = Form(""), contract_months: str = Form("12"),
-                  ha_url: str = Form(""), ha_token: str = Form(""), notify_service: str = Form("")):
+                  ha_url: str = Form(""), ha_token: str = Form(""), notify_service: str = Form(""),
+                  show_dual_fuel: str = Form("")):
     c = conn()
     try:
         for k, v in (("current_plan_id", current_plan_id), ("contract_start", contract_start),
-                     ("contract_months", contract_months), ("ha_url", ha_url), ("notify_service", notify_service)):
+                     ("contract_months", contract_months), ("ha_url", ha_url), ("notify_service", notify_service),
+                     ("show_dual_fuel", "1" if show_dual_fuel else "0")):
             db.set_setting(c, k, v)
         if ha_token:  # blank = keep existing
             db.set_setting(c, "ha_token", ha_token)
