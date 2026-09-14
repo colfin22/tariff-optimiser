@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS plans (
     notes TEXT NOT NULL DEFAULT '',
     url TEXT NOT NULL DEFAULT '',
     rates_as_of TEXT NOT NULL DEFAULT '',            -- date the rates were checked
-    active INTEGER NOT NULL DEFAULT 1
+    active INTEGER NOT NULL DEFAULT 1,
+    fuel_type TEXT NOT NULL DEFAULT 'electricity'    -- 'electricity' | 'dual' (bundled gas+elec)
 );
 CREATE TABLE IF NOT EXISTS rate_bands (
     id INTEGER PRIMARY KEY,
@@ -44,6 +45,10 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    try:
+        conn.execute("ALTER TABLE plans ADD COLUMN fuel_type TEXT NOT NULL DEFAULT 'electricity'")
+    except sqlite3.OperationalError:
+        pass  # already migrated
     return conn
 
 

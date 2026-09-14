@@ -79,16 +79,11 @@ def dashboard(request: Request, days: int = 365, uploaded: str = ""):
         current_id = db.get_setting(c, "current_plan_id")
         current = next((r for r in ranking if str(r.get("plan_id")) == current_id), None)
         end = alerts.contract_end(c)
-        c.executescript(scraper.SCHEMA)
-        dual_fuel = c.execute(
-            "SELECT detail FROM suggestions WHERE field='info' AND status='pending' "
-            "AND lower(detail) LIKE '%dual%' ORDER BY detail"
-        ).fetchall()
         return templates.TemplateResponse(request, "dashboard.html", {
             "ranking": ranking, "days": days, "current": current, "current_id": current_id,
             "last_reading": freshness["m"], "n_readings": freshness["n"],
             "contract_end": end, "days_left": (end - date.today()).days if end else None,
-            "uploaded": uploaded, "dual_fuel": dual_fuel,
+            "uploaded": uploaded,
         })
     finally:
         c.close()
@@ -151,11 +146,6 @@ def suggestion_apply(sid: int):
 def suggestion_dismiss(sid: int):
     c = conn()
     try:
-        # Dual Fuel notices are a permanent reference list (Colm doesn't have dual fuel, so
-        # they never apply to him) — they stay visible and marked, never dismissible.
-        row = c.execute("SELECT detail FROM suggestions WHERE id=?", (sid,)).fetchone()
-        if row and "dual" in row["detail"].lower():
-            return RedirectResponse("/plans", status_code=303)
         c.execute("UPDATE suggestions SET status='dismissed' WHERE id=?", (sid,))
         c.commit()
     finally:

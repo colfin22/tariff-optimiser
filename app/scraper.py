@@ -129,7 +129,23 @@ def run_scrape(conn) -> dict:
         for pname, scraped in data["plans"].items():
             plan = by_name.get(pname)
             if plan is None:
-                unmatched.append(f"{supplier} {pname}")
+                if "dual" in pname.lower():
+                    # Dual-fuel plans aren't costable (Selectra doesn't publish band time
+                    # windows) but Colm wants them visible in the ranked table with a badge
+                    # rather than buried as a dismissible notice, since he doesn't have dual
+                    # fuel and wants to see at a glance which plans to skip.
+                    exists = conn.execute(
+                        "SELECT 1 FROM plans WHERE supplier=? AND name=?", (supplier, pname)).fetchone()
+                    if not exists:
+                        conn.execute(
+                            "INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,"
+                            "notes,rates_as_of,active,fuel_type) VALUES(?,?,?,?,?,?,1,'dual')",
+                            (supplier, pname, scraped["standing"] or 0, data["export"] or 0,
+                             "Auto-added from Selectra; no published band time windows, so cost "
+                             "can't be estimated.", date.today().isoformat()))
+                        new += 1
+                else:
+                    unmatched.append(f"{supplier} {pname}")
                 continue
             for label, rate in scraped["bands"].items():
                 b = conn.execute("SELECT * FROM rate_bands WHERE plan_id=? AND label=?", (plan["id"], label)).fetchone()

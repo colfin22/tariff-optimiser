@@ -35,8 +35,11 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
   <td>{{ r.name }}
     {% if loop.first %}<span class="badge best">cheapest</span>{% endif %}
     {% if current_id and r.plan_id|string == current_id %}<span class="badge current">current</span>{% endif %}
+    {% if r.fuel_type == "dual" %}<span class="badge">Dual Fuel</span>{% endif %}
   </td>
-  {% if r.error %}
+  {% if r.fuel_type == "dual" %}
+  <td colspan="3" class="dim">not applicable — you don't have dual fuel</td>
+  {% elif r.error %}
   <td colspan="3" class="bad">{{ r.error }}</td>
   {% else %}
   <td class="cost">&euro;{{ '%.0f' % r.annual_year1 }}</td>
@@ -68,17 +71,5 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
 </div>
 <p class="dim">Based on {{ n_readings }} half-hour readings; latest meter data {{ last_reading }} (ESB uploads lag 3&ndash;4 days &mdash; normal).
 Window: <a href="/?days=90">90d</a> &middot; <a href="/?days=180">180d</a> &middot; <a href="/?days=365">365d</a></p>
-{% endif %}
-
-{% if dual_fuel %}
-<div class="card">
-  <h2>Dual Fuel plans on Selectra <span class="badge">not applicable — you don't have dual fuel</span></h2>
-  <p class="dim">Seen on suppliers' rate pages but never tracked or ranked here.</p>
-  <ul>
-  {% for d in dual_fuel %}
-    <li>{{ d.detail.split(': ', 1)[1] if ': ' in d.detail else d.detail }}</li>
-  {% endfor %}
-  </ul>
-</div>
 {% endif %}
 {% endblock %}
