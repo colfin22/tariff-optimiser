@@ -57,9 +57,13 @@ def _text(chunk: str) -> str:
 def parse_page(html_src: str) -> dict:
     """Return {'plans': {name: {'bands': {label: rate_incl_vat}, 'standing': eur}}, 'export': eur_per_kwh}."""
     plans = {}
-    blocks = re.split(r'id="offer-', html_src)[1:]
+    # Selectra redesigned the offer cards 14-09-2026 (#25): the old `id="offer-*"` block markers are
+    # gone site-wide. Each card now opens with `<p><strong>PlanName</strong></p>` instead — verified
+    # present and countable across all 6 tracked supplier pages. Row-level regexes below are
+    # unaffected since they run on stripped text, not raw markup.
+    blocks = re.split(r'<p><strong>', html_src)[1:]
     for block in blocks:
-        m = re.match(r'[^"]*"[^>]*>([^<]+)<', block)
+        m = re.match(r'([^<]+)</strong>', block)
         if not m:
             continue
         name = m.group(1).replace(",", "").strip()
@@ -104,14 +108,19 @@ def run_scrape(conn) -> dict:
     conn.executescript(SCHEMA)
     # Rate changes and notices are counted apart: a notice has no Apply button by design (#20).
     new, notices, errors, unmatched, withdrawn = 0, 0, [], [], []
+    full_page_failures = 0  # #25 - every page failing at once means the scraper itself is broken,
+                            # not that every supplier changed on the same day; flagged separately so
+                            # scrape_and_notify can raise it above routine per-page noise.
     for supplier, url in PAGES.items():
         try:
             data = parse_page(fetch(url))
         except Exception as e:  # noqa: BLE001 - a failed page must alert, not crash the run
             errors.append(f"{supplier}: {e}")
+            full_page_failures += 1
             continue
         if not data["plans"]:
             errors.append(f"{supplier}: parsed 0 plans — page layout may have changed")
+            full_page_failures += 1
             continue
         if data["export"] is None:  # never let a missing export rate pass silently (#6)
             errors.append(f"{supplier}: export rate not found — page layout may have changed")
@@ -151,7 +160,8 @@ def run_scrape(conn) -> dict:
                         f"{supplier} {n} no longer listed on Selectra — deactivate?")
     conn.commit()
     return {"new_suggestions": new, "new_notices": notices, "errors": errors,
-            "unmatched": unmatched, "withdrawn": withdrawn}
+            "unmatched": unmatched, "withdrawn": withdrawn,
+            "scraper_broken": full_page_failures == len(PAGES)}
 
 
 def apply_suggestion(conn, sid: int) -> bool:
@@ -187,8 +197,13 @@ def scrape_and_notify(conn) -> dict:
         parts.append("Scrape problems: " + "; ".join(r["errors"]))
     if not parts:  # #18 - always report, so a dead scrape can't look like a quiet week
         parts.append("Weekly rate scrape ran, no changes found.")
+    if r.get("scraper_broken"):
+        # #25 - every supplier page failed at once: almost certainly the scraper itself is broken
+        # (a site-wide redesign, as happened 14-09-2026), not six suppliers changing on the same
+        # day. Say so up front so this can't blend into a routine single-page hiccup.
+        parts.insert(0, "CRITICAL: every supplier page failed to parse — the scraper is likely broken (site redesign?), not just one page.")
     try:
         alerts._notify(conn, "Tariff rates", " ".join(parts))
-    except Exception:  # noqa: BLE001 - notification failure shouldn't fail the scrape
-        pass
+    except Exception as e:  # noqa: BLE001 - notification failure shouldn't fail the scrape
+        print(f"scrape_and_notify: push notification failed: {e}")
     return r

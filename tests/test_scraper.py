@@ -11,23 +11,23 @@ from app import db, scraper
 # yet, and parsing one as a real plan queued a permanent untracked-plan suggestion (#19).
 FIXTURE = """
 <a class="menu" href="/energy/microgeneration">Microgeneration rates</a>
-<h3 id="offer-acme-standard-24hr" class="x">Standard, 24hr</h3>
+<p><strong>Standard, 24hr</strong></p>
 <table><tr><th>Time of use</th><th>Urban</th><th>Rural</th></tr>
 <tr><td>24-Hour</td><td>30.00 c/kWh</td><td>31.00 c/kWh</td></tr>
 <tr><td>Standing charge</td><td>&euro;250.00/yr</td><td>&euro;280.00/yr</td></tr></table>
-<h3 id="offer-acme-smart-electricity" class="x">Smart Electricity</h3>
+<p><strong>Smart Electricity</strong></p>
 <table>
 <tr><td>Day</td><td>33.34 c/kWh</td><td>34.00 c/kWh</td></tr>
 <tr><td>Night</td><td>24.61 c/kWh</td><td>25.00 c/kWh</td></tr>
 <tr><td>Peak</td><td>40.58 c/kWh</td><td>41.00 c/kWh</td></tr>
 <tr><td>Standing charge</td><td>&euro;244.76/yr</td><td>&euro;281.89/yr</td></tr></table>
-<h3 id="offer-acme-ev-drive" class="x">EV Smart Drive</h3>
+<p><strong>EV Smart Drive</strong></p>
 <table>
 <tr><td>Day</td><td>36.85 c/kWh</td><td>37.00 c/kWh</td></tr>
 <tr><td>Night Boost</td><td>8.65 c/kWh</td><td>9.00 c/kWh</td></tr></table>
-<h3 id="offer-acme-standard-gas" class="x">Standard Gas</h3>
+<p><strong>Standard Gas</strong></p>
 <table><tr><td>24-Hour</td><td>9.10 c/kWh</td><td>9.10 c/kWh</td></tr></table>
-<h3 id="offer-acme-activ8" class="x">Activ8</h3>
+<p><strong>Activ8</strong></p>
 <table><tr><td>24-Hour</td><td>0.00 c/kWh</td><td>0.00 c/kWh</td></tr>
 <tr><td>Standing charge</td><td>&euro;0.00/yr</td><td>&euro;0.00/yr</td></tr></table>
 <h2>Acme microgeneration export rate comparison table</h2>
@@ -57,7 +57,7 @@ def test_placeholder_zero_rate_plan_is_skipped():
     back of that would have seeded a EUR 0/yr plan that instantly wins the ranking."""
     assert "Activ8" not in scraper.parse_page(FIXTURE)["plans"]
     # A single zero band is legitimate (free-hours plans), so only an ALL-zero block is dropped.
-    free = ('<h3 id="offer-acme-free-time">Free Time</h3>'
+    free = ('<p><strong>Free Time</strong></p>'
             '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr>'
             '<tr><td>Night</td><td>0.00 c/kWh</td></tr></table>')
     assert scraper.parse_page(free)["plans"]["Free Time"]["bands"]["Night"] == 0.0
@@ -67,7 +67,7 @@ def test_export_ignores_the_nav_link_and_reads_the_table():
     """#6 — the bug: 'Microgeneration rates' appears first as a nav link with no figure. Anchor
     on the '… export rate comparison table …' section, or export silently reads None."""
     html = ('<a href="/energy/microgeneration">Microgeneration rates</a>'
-            '<h3 id="offer-acme-smart">Smart</h3>'
+            '<p><strong>Smart</strong></p>'
             '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr></table>'
             '<h2>Acme microgeneration export rate comparison table</h2>'
             '<table><tr><td>Export rate</td><td>Payment method</td></tr>'
@@ -86,7 +86,7 @@ def test_missing_export_is_flagged_not_silent(monkeypatch):
         conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) VALUES('Acme','Smart',240.0,0.20)")
         conn.commit()
         no_export = ('<a href="/energy/microgeneration">Microgeneration rates</a>'
-                     '<h3 id="offer-acme-smart">Smart</h3>'
+                     '<p><strong>Smart</strong></p>'
                      '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr></table>')
         monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
         monkeypatch.setattr(scraper, "fetch", lambda url: no_export)
@@ -252,5 +252,59 @@ def test_quiet_run_still_notifies(monkeypatch):
         scraper.scrape_and_notify(conn)
         assert len(sent) == 1
         assert "no changes" in sent[0][1]
+    finally:
+        os.unlink(path)
+
+
+def test_every_page_failing_is_flagged_scraper_broken(monkeypatch):
+    """#25 — Selectra redesigned the offer markup 14-09-2026 and every one of the 6 supplier pages
+    parsed 0 plans at once. That's the scraper being broken (a site-wide redesign), not six
+    suppliers changing on the same day — must be distinguishable from an ordinary single-page
+    hiccup, both in run_scrape's return value and in the pushed message."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture", "Beta": "http://fixture2"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: "<html><body>redesigned, no plan markers</body></html>")
+        r = scraper.run_scrape(conn)
+        assert r["scraper_broken"] is True
+    finally:
+        os.unlink(path)
+
+
+def test_single_page_failure_is_not_flagged_scraper_broken(monkeypatch):
+    """The critical banner is for a total wipeout only — one bad page among several good ones is
+    routine and must not trigger it."""
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        pages = {"Acme": "http://fixture", "Beta": "http://fixture2"}
+        monkeypatch.setattr(scraper, "PAGES", pages)
+        monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE if url == "http://fixture" else "<html>broken</html>")
+        r = scraper.run_scrape(conn)
+        assert r["scraper_broken"] is False
+    finally:
+        os.unlink(path)
+
+
+def test_scraper_broken_prefixes_critical_in_the_push(monkeypatch):
+    from app import alerts
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    conn = db.connect(path)
+    try:
+        conn.executescript(scraper.SCHEMA)
+        sent = []
+        monkeypatch.setattr(scraper, "run_scrape",
+                            lambda c: {"new_suggestions": 0, "new_notices": 0,
+                                       "errors": ["Acme: parsed 0 plans"], "unmatched": [],
+                                       "scraper_broken": True})
+        monkeypatch.setattr(alerts, "_notify", lambda c, title, msg: sent.append((title, msg)))
+        scraper.scrape_and_notify(conn)
+        assert sent[0][1].startswith("CRITICAL")
     finally:
         os.unlink(path)
