@@ -46,6 +46,10 @@ PLANS = [
     ("SSE Airtricity", "Smart Electricity", 242.07, 0.24, "", "",
      [(DAY, 29.95), (NIGHT, 19.25), (PEAK, 33.54)]),
     ("SSE Airtricity", "Smart Everyday", 243.86, 0.24, "", "", [(FLAT, 30.85)]),
+    # Added 02-11-2026 at that day's Selectra rates (the rest of this list is 05-07-2026). Selectra
+    # doesn't publish D/N windows; the standard 23:00-08:00 night is assumed, as for EI NightSaver.
+    ("SSE Airtricity", "NightSaver", 359.70, 0.195, "Non-smart D/N meter; night window 23:00-08:00 winter (09:00 summer)", "",
+     [(DAY, 31.83), (NIGHT, 19.26)]),
     ("Energia", "Standard 24hr", 265.01, 0.20, "", "https://selectra.ie/energy/providers/energia/rates",
      [(FLAT, 27.39)]),
     ("Energia", "Smart 24 Hour", 265.01, 0.20, "", "", [(FLAT, 25.78)]),
@@ -64,6 +68,9 @@ PLANS = [
     ("Flogas", "Smart Electricity", 248.12, 0.185, "", "",
      [(DAY, 29.74), (NIGHT, 19.05), (PEAK, 35.19)]),
     ("Flogas", "Smart 24hr", 248.12, 0.185, "", "", [(FLAT, 27.30)]),
+    # Added 02-11-2026 — see the SSE NightSaver note above.
+    ("Flogas", "NightSaver", 393.52, 0.185, "Non-smart D/N meter; night window 23:00-08:00 winter (09:00 summer)", "",
+     [(DAY, 40.44), (NIGHT, 19.60)]),
     ("Pinergy", "Standard 24hr", 260.06, 0.25, "Pay-as-you-go; best export rate; name matches Selectra for the scraper", "https://selectra.ie/energy/providers/pinergy/rates",
      [(FLAT, 42.77)]),
 ]
