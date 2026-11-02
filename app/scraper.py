@@ -131,9 +131,31 @@ def run_scrape(conn) -> dict:
             if plan is None:
                 unmatched.append(f"{supplier} {pname}")
                 continue
+            stored = {}
+            for b in conn.execute("SELECT * FROM rate_bands WHERE plan_id=?", (plan["id"],)):
+                stored.setdefault(b["label"], b)
+            # Flat-rate smart plans (e.g. 'Smart 24') are stored as one 'All hours' band, but
+            # Selectra lists them as Day/Night/Peak rows carrying the same figure. Matching on label
+            # alone found no stored band and skipped the comparison SILENTLY, so those plans' unit
+            # rates were never checked. Map equal Day/Night/Peak onto 'All hours'; anything that
+            # still has no stored band is an error, never a quiet skip.
+            compare, flat = {}, []
             for label, rate in scraped["bands"].items():
-                b = conn.execute("SELECT * FROM rate_bands WHERE plan_id=? AND label=?", (plan["id"], label)).fetchone()
-                if b and abs(b["rate"] - rate) > 0.00005:
+                if label in stored:
+                    compare[label] = rate
+                elif label in ("Day", "Night", "Peak") and "All hours" in stored:
+                    flat.append(rate)
+                else:
+                    errors.append(f"{supplier} {pname}: Selectra band '{label}' has no stored band to compare")
+            if flat:
+                if len(set(flat)) == 1 and "All hours" not in compare:
+                    compare["All hours"] = flat[0]
+                else:
+                    errors.append(f"{supplier} {pname}: stored as one 'All hours' rate but Selectra "
+                                  f"lists different Day/Night/Peak rates {sorted(set(flat))}")
+            for label, rate in compare.items():
+                b = stored[label]
+                if abs(b["rate"] - rate) > 0.00005:
                     new += _suggest(conn, plan["id"], f"band:{label}", b["rate"], rate,
                                     f"{supplier} {pname} {label}")
             if scraped["standing"] is not None and abs(plan["standing_charge_annual"] - scraped["standing"]) > 0.005:

@@ -106,6 +106,12 @@ def test_suggest_and_apply(monkeypatch):
         pid = cur.lastrowid
         conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
                      (pid, "Day", 0.3500, "08:00", "23:00"))
+        # Night/Peak stored at the fixture's values: every scraped band must have a stored
+        # counterpart now (an unmatched band is an error), but only Day differs.
+        conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                     (pid, "Night", round(24.61 * 1.09 / 100, 4), "23:00", "08:00"))
+        conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                     (pid, "Peak", round(40.58 * 1.09 / 100, 4), "17:00", "19:00"))
         conn.commit()
         monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
         monkeypatch.setattr(scraper, "fetch", lambda url: FIXTURE)
@@ -306,5 +312,56 @@ def test_scraper_broken_prefixes_critical_in_the_push(monkeypatch):
         monkeypatch.setattr(alerts, "_notify", lambda c, title, msg: sent.append((title, msg)))
         scraper.scrape_and_notify(conn)
         assert sent[0][1].startswith("CRITICAL")
+    finally:
+        os.unlink(path)
+
+
+FLAT_SMART = ('<p><strong>Smart 24</strong></p>'
+              '<table><tr><td>Day</td><td>30.00 c/kWh</td></tr>'
+              '<tr><td>Night</td><td>30.00 c/kWh</td></tr>'
+              '<tr><td>Peak</td><td>30.00 c/kWh</td></tr>'
+              '<tr><td>Standing charge</td><td>&euro;250.00/yr</td></tr></table>'
+              '<h2>Acme microgeneration export rate comparison table</h2>'
+              '<table><tr><td>21.00 c/kWh</td></tr></table>')
+
+
+def test_flat_smart_plan_rate_change_is_caught(monkeypatch):
+    """A flat smart plan is stored as one 'All hours' band but Selectra lists equal Day/Night/Peak
+    rows. Matching on label alone skipped it silently, so its unit rate was never checked."""
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        pid = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) "
+                           "VALUES('Acme','Smart 24',250.0,0.21)").lastrowid
+        conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                     (pid, "All hours", 0.2976, "00:00", "00:00"))
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FLAT_SMART)
+        r = scraper.run_scrape(conn)
+        assert not r["errors"]
+        s = conn.execute("SELECT * FROM suggestions WHERE status='pending' AND plan_id=?", (pid,)).fetchall()
+        assert [(x["field"], x["suggested"]) for x in s] == [("band:All hours", round(30.00 * 1.09 / 100, 4))]
+        assert scraper.apply_suggestion(conn, s[0]["id"])
+        assert conn.execute("SELECT rate FROM rate_bands WHERE plan_id=?", (pid,)).fetchone()["rate"] == 0.327
+    finally:
+        os.unlink(path)
+
+
+def test_unmatched_band_is_an_error_not_a_silent_skip(monkeypatch):
+    """Flat plan whose Selectra rows DIFFER can't be mapped to one rate — must be flagged."""
+    conn, path = _scratch_db()
+    try:
+        conn.executescript(scraper.SCHEMA)
+        pid = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate) "
+                           "VALUES('Acme','Smart 24',250.0,0.21)").lastrowid
+        conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                     (pid, "All hours", 0.327, "00:00", "00:00"))
+        conn.commit()
+        monkeypatch.setattr(scraper, "PAGES", {"Acme": "http://fixture"})
+        monkeypatch.setattr(scraper, "fetch", lambda url: FLAT_SMART.replace(
+            "<td>Peak</td><td>30.00", "<td>Peak</td><td>40.00"))
+        r = scraper.run_scrape(conn)
+        assert any("different Day/Night/Peak" in e for e in r["errors"])
     finally:
         os.unlink(path)
