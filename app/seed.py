@@ -31,6 +31,10 @@ def v(cent: float) -> float:
 PLANS = [
     ("Electric Ireland", "Standard 24hr", 250.77, 0.195, "", "https://selectra.ie/energy/providers/electric-ireland/rates",
      [(FLAT, 31.27)]),
+    # Added 09-11-2026 at that day's Selectra rates. Selectra lists Smart Night Boost with Day/Night
+    # rows only (no boost rate or window), so it is costed as a plain D/N plan for now.
+    ("Electric Ireland", "Smart Night Boost", 328.58, 0.195, "Smart meter; Selectra lists Day/Night only (no boost window published); night 23:00-08:00 assumed", "",
+     [(DAY, 34.49), (NIGHT, 17.01)]),
     ("Electric Ireland", "NightSaver", 328.58, 0.195, "Non-smart D/N meter; night window 23:00-08:00 winter (09:00 summer)", "",
      [(DAY, 35.06), (NIGHT, 17.29)]),
     ("Electric Ireland", "Smart Electricity", 250.77, 0.195, "", "",
@@ -41,6 +45,9 @@ PLANS = [
     ("Bord Gáis Energy", "Smart Electricity", 244.76, 0.185, "", "",
      [(DAY, 33.34), (NIGHT, 24.61), (PEAK, 40.58)]),
     ("Bord Gáis Energy", "Smart All Day", 244.76, 0.185, "", "", [(FLAT, 31.20)]),
+    # Added 09-11-2026 — see the SSE NightSaver note below.
+    ("Bord Gáis Energy", "NightSaver", 345.02, 0.185, "Non-smart D/N meter; night window 23:00-08:00 winter (09:00 summer)", "",
+     [(DAY, 32.23), (NIGHT, 15.96)]),
     ("SSE Airtricity", "Standard 24hr", 242.07, 0.24, "", "https://selectra.ie/energy/providers/sse-airtricity/rates",
      [(FLAT, 28.30)]),
     ("SSE Airtricity", "Smart Electricity", 242.07, 0.24, "", "",
