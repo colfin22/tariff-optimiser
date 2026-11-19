@@ -14,9 +14,9 @@ def make_db():
     return db.connect(path)
 
 
-def add_flat_plan(conn, supplier, name, rate, standing=278.0, discount_pct=0, discount_months=0):
-    cur = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,discount_pct,discount_months) "
-                       "VALUES(?,?,?,?,?)", (supplier, name, standing, discount_pct, discount_months))
+def add_flat_plan(conn, supplier, name, rate, standing=278.0, discount_pct=0, discount_months=0, exit_fee=0):
+    cur = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,discount_pct,discount_months,exit_fee) "
+                       "VALUES(?,?,?,?,?,?)", (supplier, name, standing, discount_pct, discount_months, exit_fee))
     conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
                  (cur.lastrowid, "All hours", rate, "00:00", "00:00"))
     conn.commit()
@@ -97,5 +97,45 @@ def test_old_database_gets_discount_columns():
     old.commit()
     old.close()
     conn = db.connect(path)
-    row = conn.execute("SELECT discount_pct, discount_months FROM plans").fetchone()
-    assert (row["discount_pct"], row["discount_months"]) == (0, 0)
+    row = conn.execute("SELECT discount_pct, discount_months, exit_fee FROM plans").fetchone()
+    assert (row["discount_pct"], row["discount_months"], row["exit_fee"]) == (0, 0, 0)
+
+
+# --- exit fee -------------------------------------------------------------------------------------
+
+def _ranking(fee):
+    return [
+        {"plan_id": 1, "supplier": "A", "name": "x", "annual_year1": 1000, "annual_ongoing": 1100, "exit_fee": fee},
+        {"plan_id": 2, "supplier": "B", "name": "y", "annual_year1": 1070, "annual_ongoing": 1070, "exit_fee": 0},
+    ]
+
+
+def test_exit_fee_applies_only_before_contract_end():
+    before = alerts.renewal_choice(_ranking(50), "1", before_contract_end=True)
+    after = alerts.renewal_choice(_ranking(50), "1", before_contract_end=False)
+    assert before["exit_fee_applied"] == 50 and before["saving"] == -20 and before["saving_at_end"] == 30
+    assert after["exit_fee_applied"] == 0 and after["saving"] == 30
+
+
+def test_exit_fee_of_another_plan_is_ignored():
+    r = _ranking(0)
+    r[1]["exit_fee"] = 99  # fee on the plan you'd switch TO doesn't apply to leaving the current one
+    assert alerts.renewal_choice(r, "1", before_contract_end=True)["saving"] == 30
+
+
+def test_alert_mentions_exit_fee_when_it_cancels_the_saving(conn):
+    cur = add_flat_plan(conn, "A", "Flat", 0.300, exit_fee=50)
+    add_flat_plan(conn, "B", "Flat", 0.295)  # about €24/yr cheaper on 4,758 kWh
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 11, 20))
+    assert "Cheapest for your usage: B Flat" in r["message"]
+    assert "€50 exit fee, which cancels the saving" in r["message"]
+
+
+def test_alert_has_no_exit_fee_on_contract_end_day(conn):
+    cur = add_flat_plan(conn, "A", "Flat", 0.300, exit_fee=50)
+    add_flat_plan(conn, "B", "Flat", 0.28)
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 12, 12))
+    assert r["status"] == "alerted"
+    assert "exit fee" not in r["message"]

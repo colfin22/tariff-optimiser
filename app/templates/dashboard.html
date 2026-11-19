@@ -45,7 +45,7 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
   <td class="cost dim">&euro;{{ '%.0f' % r.annual_ongoing }}</td>
   <td class="cost">
     {% if current and not r.error and r.plan_id != current.plan_id %}
-      {% set diff = stay_cost - r.annual_year1 %}
+      {% set diff = stay_cost - r.annual_year1 - exit_fee_applied %}
       {% if diff > 0 %}<span class="save">save &euro;{{ '%.0f' % diff }}</span>
       {% else %}<span class="dim">+&euro;{{ '%.0f' % -diff }}</span>{% endif %}
     {% endif %}
@@ -69,6 +69,7 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
 </table>
 </div>
 <p class="dim">Based on {{ n_readings }} half-hour readings; latest meter data {{ last_reading }} (ESB uploads lag 3&ndash;4 days &mdash; normal).
+{% if exit_fee_applied %}"vs staying" includes your current plan's &euro;{{ '%.0f' % exit_fee_applied }} exit fee, charged for switching before {{ contract_end.strftime('%d-%m-%Y') }}.<br>{% endif %}
 Window: <a href="/?days=90">90d</a> &middot; <a href="/?days=180">180d</a> &middot; <a href="/?days=365">365d</a></p>
 {% endif %}
 {% endblock %}
