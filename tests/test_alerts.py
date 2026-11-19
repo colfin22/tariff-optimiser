@@ -1,0 +1,101 @@
+import os
+import sqlite3
+import tempfile
+from datetime import date, timedelta
+
+import pytest
+
+from app import alerts, db
+
+
+def make_db():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    return db.connect(path)
+
+
+def add_flat_plan(conn, supplier, name, rate, standing=278.0, discount_pct=0, discount_months=0):
+    cur = conn.execute("INSERT INTO plans(supplier,name,standing_charge_annual,discount_pct,discount_months) "
+                       "VALUES(?,?,?,?,?)", (supplier, name, standing, discount_pct, discount_months))
+    conn.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time) VALUES(?,?,?,?,?)",
+                 (cur.lastrowid, "All hours", rate, "00:00", "00:00"))
+    conn.commit()
+    return cur.lastrowid
+
+
+def add_year_of_readings(conn, kwh_per_day=13.0):
+    d = date(2025, 10, 3)
+    rows = [(f"{d + timedelta(days=i):%Y-%m-%d} 12:00", kwh_per_day, 0.0) for i in range(366)]
+    conn.executemany("INSERT INTO readings(interval_end,import_kwh,export_kwh) VALUES(?,?,?)", rows)
+    conn.commit()
+
+
+@pytest.fixture
+def conn(monkeypatch):
+    c = make_db()
+    add_year_of_readings(c)
+    monkeypatch.setattr(alerts, "_notify", lambda conn, title, msg: None)  # no Home Assistant in tests
+    return c
+
+
+def set_contract(conn, plan_id, start="12-12-2025"):
+    db.set_setting(conn, "current_plan_id", str(plan_id))
+    db.set_setting(conn, "contract_start", start)
+    db.set_setting(conn, "contract_months", "12")
+
+
+def test_alert_compares_against_current_plans_standard_rate(conn):
+    # Current plan is the cheapest while discounted (29.64c), but at its 41.75c standard rate a
+    # 33c plan wins. Year-1 vs year-1 would wrongly say "still the cheapest".
+    cur = add_flat_plan(conn, "Energia", "Flat", 0.2964, discount_pct=29, discount_months=12)
+    add_flat_plan(conn, "Other", "Smart 24", 0.33)
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 11, 20))
+    assert r["status"] == "alerted"
+    assert "goes back to its standard rate" in r["message"]
+    assert "Other Smart 24" in r["message"] and "saves" in r["message"]
+
+
+def test_alert_says_current_still_cheapest_at_standard_rate(conn):
+    cur = add_flat_plan(conn, "Energia", "Flat", 0.2964, discount_pct=29, discount_months=12)
+    add_flat_plan(conn, "Other", "Dear", 0.45)
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 11, 20))
+    assert "still the cheapest" in r["message"]
+    assert "Other Dear" not in r["message"]
+
+
+def test_alert_unchanged_for_plans_without_discount(conn):
+    cur = add_flat_plan(conn, "A", "Flat", 0.30)
+    add_flat_plan(conn, "B", "Flat", 0.28)
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 11, 20))
+    assert "standard rate" not in r["message"]
+    assert "Cheapest for your usage: B Flat" in r["message"]
+
+
+def test_renewal_choice_never_picks_current_as_best():
+    ranking = [
+        {"plan_id": 1, "supplier": "A", "name": "x", "annual_year1": 1000, "annual_ongoing": 1500},
+        {"plan_id": 2, "supplier": "B", "name": "y", "annual_year1": 1200, "annual_ongoing": 1200},
+    ]
+    c = alerts.renewal_choice(ranking, "1")
+    assert c["best"]["plan_id"] == 2
+    assert c["stay_cost"] == 1500
+    assert c["saving"] == 300
+
+
+def test_old_database_gets_discount_columns():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE plans (id INTEGER PRIMARY KEY, supplier TEXT NOT NULL, name TEXT NOT NULL, "
+                "standing_charge_annual REAL NOT NULL DEFAULT 0, export_rate REAL NOT NULL DEFAULT 0, "
+                "signup_credit REAL NOT NULL DEFAULT 0, notes TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', "
+                "rates_as_of TEXT NOT NULL DEFAULT '', active INTEGER NOT NULL DEFAULT 1)")
+    old.execute("INSERT INTO plans(supplier,name) VALUES('A','x')")
+    old.commit()
+    old.close()
+    conn = db.connect(path)
+    row = conn.execute("SELECT discount_pct, discount_months FROM plans").fetchone()
+    assert (row["discount_pct"], row["discount_months"]) == (0, 0)

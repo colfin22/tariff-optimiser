@@ -42,6 +42,25 @@ class Plan:
     signup_credit: float = 0.0
     bands: list[Band] = field(default_factory=list)
     id: int = 0
+    # Band rates hold the price you pay during the discount (what Selectra lists and the scraper
+    # fills). A plan with discount_pct > 0 rolls back to the standard rate, rate / (1 - pct/100),
+    # once discount_months have passed. 0 = no expiring discount, the rates are permanent.
+    discount_pct: float = 0.0
+    discount_months: int = 0
+
+    @property
+    def standard_factor(self) -> float:
+        """Multiplier from the discounted band rates back to the supplier's standard rates."""
+        if self.discount_pct <= 0 or self.discount_months <= 0:
+            return 1.0
+        return 1.0 / (1.0 - min(self.discount_pct, 99.0) / 100.0)
+
+    @property
+    def discounted_share_of_year1(self) -> float:
+        """Fraction of the first 12 months billed at the discounted rate."""
+        if self.standard_factor == 1.0:
+            return 1.0
+        return min(self.discount_months, 12) / 12.0
 
     def band_for(self, t: datetime) -> Band:
         best = None
@@ -58,6 +77,11 @@ def cost_plan(plan: Plan, readings: list[tuple[str, float, float]]) -> dict:
     """readings: list of (interval_end 'YYYY-MM-DD HH:MM', import_kwh, export_kwh).
 
     Returns euro figures for the readings window plus annualised year-1/ongoing totals.
+    annual_year1 is the first 12 months on the plan: the discounted rate for discount_months, the
+    standard rate after that, less any signup credit. annual_ongoing is a later year, at the
+    standard rate with no signup credit, which is also what staying on a plan costs at renewal.
+    The split between discounted and standard months is pro rata by month count, not weighted by
+    season.
     """
     if not readings:
         raise ValueError("no readings in window")
@@ -81,7 +105,13 @@ def cost_plan(plan: Plan, readings: list[tuple[str, float, float]]) -> dict:
     export_credit = export_kwh * plan.export_rate
     standing = plan.standing_charge_annual * days / 365.0
     window_cost = import_cost - export_credit + standing
-    annual_ongoing = (import_cost - export_credit) * scale + plan.standing_charge_annual
+    import_annual = import_cost * scale  # at the band (discounted) rates
+    import_standard = import_annual * plan.standard_factor
+    share = plan.discounted_share_of_year1
+    import_year1 = import_annual * share + import_standard * (1 - share)
+    export_annual = export_credit * scale
+    annual_ongoing = import_standard - export_annual + plan.standing_charge_annual
+    annual_year1 = import_year1 - export_annual + plan.standing_charge_annual - plan.signup_credit
     return {
         "window_days": round(days, 1),
         "import_kwh": round(import_kwh, 1),
@@ -91,7 +121,9 @@ def cost_plan(plan: Plan, readings: list[tuple[str, float, float]]) -> dict:
         "standing": round(standing, 2),
         "window_cost": round(window_cost, 2),
         "annual_ongoing": round(annual_ongoing, 2),
-        "annual_year1": round(annual_ongoing - plan.signup_credit, 2),
+        "annual_year1": round(annual_year1, 2),
+        "discount_pct": plan.discount_pct,
+        "discount_months": plan.discount_months,
         "per_band": {k: {"kwh": round(v["kwh"], 1), "eur": round(v["eur"], 2), "rate": v["rate"]}
                      for k, v in per_band.items()},
     }
@@ -106,7 +138,8 @@ def load_plans(conn, active_only: bool = True) -> list[Plan]:
                  for b in conn.execute("SELECT * FROM rate_bands WHERE plan_id=?", (p["id"],))]
         plans.append(Plan(supplier=p["supplier"], name=p["name"],
                           standing_charge_annual=p["standing_charge_annual"], export_rate=p["export_rate"],
-                          signup_credit=p["signup_credit"], bands=bands, id=p["id"]))
+                          signup_credit=p["signup_credit"], bands=bands, id=p["id"],
+                          discount_pct=p["discount_pct"], discount_months=p["discount_months"]))
     return plans
 
 

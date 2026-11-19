@@ -106,3 +106,48 @@ def test_gap_raises():
     plan = Plan("T", "Gappy", bands=[Band("Day", 0.4, "08:00", "23:00")])
     with pytest.raises(PlanCoverageError):
         cost_plan(plan, day_of([("03:00", 1.0)]))
+
+
+# --- expiring discounts ------------------------------------------------------------------------
+
+def _flat(rate, **kw):
+    return Plan("T", "Flat", standing_charge_annual=278.27, bands=[Band("All", rate, "00:00", "00:00")], **kw)
+
+
+def test_no_discount_keeps_year1_and_ongoing_as_before():
+    r = cost_plan(_flat(0.2964, signup_credit=50.0), full_year_flat())
+    assert r["annual_year1"] == pytest.approx(r["annual_ongoing"] - 50.0)
+
+
+def test_12_month_discount_rolls_back_to_standard_rate():
+    # A 29% discount on a 41.75c standard rate is billed at 29.64c (Energia flat, Oct 2026).
+    discounted = _flat(0.2964, discount_pct=29, discount_months=12)
+    standard = _flat(0.2964 / 0.71)
+    rows = full_year_flat()
+    r = cost_plan(discounted, rows)
+    assert r["annual_year1"] == pytest.approx(cost_plan(_flat(0.2964), rows)["annual_year1"])
+    assert r["annual_ongoing"] == pytest.approx(cost_plan(standard, rows)["annual_ongoing"])
+    assert r["annual_ongoing"] > r["annual_year1"]
+
+
+def test_short_discount_is_pro_rata_in_year1():
+    rows = full_year_flat()
+    low = cost_plan(_flat(0.20), rows)["annual_year1"]
+    high = cost_plan(_flat(0.20 / 0.8), rows)["annual_year1"]
+    r = cost_plan(_flat(0.20, discount_pct=20, discount_months=6), rows)
+    assert r["annual_year1"] == pytest.approx((low + high) / 2)
+
+
+def test_discount_does_not_touch_standing_charge_or_export_credit():
+    plan = Plan("T", "Export", standing_charge_annual=300.0, export_rate=0.20, discount_pct=50,
+                discount_months=12, bands=[Band("All", 0.30, "00:00", "00:00")])
+    r = cost_plan(plan, full_year_flat())
+    no_disc = cost_plan(Plan("T", "Export", standing_charge_annual=300.0, export_rate=0.20,
+                             bands=[Band("All", 0.30, "00:00", "00:00")]), full_year_flat())
+    import_annual = no_disc["annual_ongoing"] - 300.0 + no_disc["export_credit"] * (365 / r["window_days"])
+    assert r["annual_ongoing"] - r["annual_year1"] == pytest.approx(import_annual, rel=1e-6)
+
+
+def test_discount_months_without_pct_is_ignored():
+    r = cost_plan(_flat(0.30, discount_months=12), full_year_flat())
+    assert r["annual_year1"] == pytest.approx(r["annual_ongoing"])

@@ -27,14 +27,16 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
 {% else %}
 <div class="card">
 <table>
-<tr><th></th><th>Supplier</th><th>Plan</th><th>Year-1 cost</th><th>Ongoing</th><th>vs current</th><th></th></tr>
+<tr><th></th><th>Supplier</th><th>Plan</th><th>Year-1 cost</th><th>Ongoing</th><th title="Against staying on your current plan after its contract ends">vs staying</th><th></th></tr>
 {% for r in ranking %}
 <tr {% if current_id and r.plan_id|string == current_id %}class="current"{% endif %}>
   <td>{{ loop.index }}</td>
   <td>{{ r.supplier }}</td>
   <td>{{ r.name }}
     {% if loop.first %}<span class="badge best">cheapest</span>{% endif %}
-    {% if current_id and r.plan_id|string == current_id %}<span class="badge current">current</span>{% endif %}
+    {% if current_id and r.plan_id|string == current_id %}<span class="badge current">current</span>
+      {% if r.discount_pct and r.discount_months %}<br><span class="dim">{{ '%g' % r.discount_pct }}% off for {{ r.discount_months }} months, then &euro;{{ '%.0f' % r.annual_ongoing }}/yr to stay</span>{% endif %}
+    {% endif %}
   </td>
   {% if r.error %}
   <td colspan="3" class="bad">{{ r.error }}</td>
@@ -43,7 +45,7 @@ Or run the automated ingest (POST /api/ingest) once the HDF file is in /data.
   <td class="cost dim">&euro;{{ '%.0f' % r.annual_ongoing }}</td>
   <td class="cost">
     {% if current and not r.error and r.plan_id != current.plan_id %}
-      {% set diff = current.annual_year1 - r.annual_year1 %}
+      {% set diff = stay_cost - r.annual_year1 %}
       {% if diff > 0 %}<span class="save">save &euro;{{ '%.0f' % diff }}</span>
       {% else %}<span class="dim">+&euro;{{ '%.0f' % -diff }}</span>{% endif %}
     {% endif %}

@@ -60,6 +60,8 @@
       <label>Standing &euro;/yr <input name="standing" type="number" step="0.01" value="{{ p.standing_charge_annual }}"></label>
       <label>Export &euro;/kWh <input name="export_rate" type="number" step="0.0001" value="{{ p.export_rate }}"></label>
       <label>Signup credit &euro; <input name="signup_credit" type="number" step="0.01" value="{{ p.signup_credit }}"></label>
+      <label>Discount % <input name="discount_pct" type="number" step="0.01" min="0" max="99" value="{{ p.discount_pct }}" size="5"></label>
+      <label>for months <input name="discount_months" type="number" step="1" min="0" value="{{ p.discount_months }}" size="3"></label>
       <label>Rates as of <input name="rates_as_of" value="{{ p.rates_as_of }}" placeholder="YYYY-MM-DD" size="10"></label>
       <label>Active <select name="active"><option value="1" {% if p.active %}selected{% endif %}>yes</option><option value="0" {% if not p.active %}selected{% endif %}>no</option></select></label>
     </div>
@@ -113,10 +115,12 @@
       <label>Standing &euro;/yr <input name="standing" type="number" step="0.01" value="0"></label>
       <label>Export &euro;/kWh <input name="export_rate" type="number" step="0.0001" value="0"></label>
       <label>Signup credit &euro; <input name="signup_credit" type="number" step="0.01" value="0"></label>
+      <label>Discount % <input name="discount_pct" type="number" step="0.01" min="0" max="99" value="0" size="5"></label>
+      <label>for months <input name="discount_months" type="number" step="1" min="0" value="0" size="3"></label>
       <label>Rates as of <input name="rates_as_of" placeholder="YYYY-MM-DD" size="10"></label>
       <button>Create</button>
     </div>
   </form>
-  <p class="dim">Enter rates including VAT. Bands must cover all 168 hours (use a wrapping 00:00&ndash;00:00 band for flat plans); use priority to layer Peak/EV/Free windows over Day/Night.</p>
+  <p class="dim">Enter rates including VAT, at the price you pay now (the discounted rate, as Selectra lists it). If the discount ends, set Discount % and how many months it lasts: after that the plan is costed at the standard rate, rate &divide; (1 &minus; discount). Leave both at 0 for a rate that doesn't change. Bands must cover all 168 hours (use a wrapping 00:00&ndash;00:00 band for flat plans); use priority to layer Peak/EV/Free windows over Day/Night.</p>
 </div>
 {% endblock %}

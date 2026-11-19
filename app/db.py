@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS plans (
     standing_charge_annual REAL NOT NULL DEFAULT 0,  -- € incl. VAT
     export_rate REAL NOT NULL DEFAULT 0,             -- €/kWh microgen credit
     signup_credit REAL NOT NULL DEFAULT 0,           -- € one-off, year-1 only
+    discount_pct REAL NOT NULL DEFAULT 0,            -- % off the standard unit rate; band rates are the discounted rates
+    discount_months INTEGER NOT NULL DEFAULT 0,      -- how long the discount lasts; 0 = no expiring discount
     notes TEXT NOT NULL DEFAULT '',
     url TEXT NOT NULL DEFAULT '',
     rates_as_of TEXT NOT NULL DEFAULT '',            -- date the rates were checked
@@ -44,7 +46,27 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     return conn
+
+
+# Columns added after the first release. CREATE TABLE IF NOT EXISTS leaves an existing database's
+# tables alone, so older databases get these with ALTER TABLE (defaults keep old behaviour).
+MIGRATIONS = {
+    "plans": [
+        ("discount_pct", "REAL NOT NULL DEFAULT 0"),
+        ("discount_months", "INTEGER NOT NULL DEFAULT 0"),
+    ],
+}
+
+
+def _migrate(conn) -> None:
+    for table, cols in MIGRATIONS.items():
+        have = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for name, ddl in cols:
+            if name not in have:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
+    conn.commit()
 
 
 def get_setting(conn, key: str, default: str = "") -> str:

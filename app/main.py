@@ -77,10 +77,12 @@ def dashboard(request: Request, days: int = 365, uploaded: str = ""):
         freshness = c.execute("SELECT MAX(interval_end) m, COUNT(*) n FROM readings").fetchone()
         ranking = engine.rank_plans(c, days) if freshness["n"] else []
         current_id = db.get_setting(c, "current_plan_id")
-        current = next((r for r in ranking if str(r.get("plan_id")) == current_id), None)
+        renewal = alerts.renewal_choice(ranking, current_id)
+        current = renewal["current"]
         end = alerts.contract_end(c)
         return templates.TemplateResponse(request, "dashboard.html", {
             "ranking": ranking, "days": days, "current": current, "current_id": current_id,
+            "stay_cost": renewal["stay_cost"],
             "last_reading": freshness["m"], "n_readings": freshness["n"],
             "contract_end": end, "days_left": (end - date.today()).days if end else None,
             "uploaded": uploaded,
@@ -167,11 +169,14 @@ def suggestions_apply_all():
 @app.post("/plans/new")
 def plan_new(supplier: str = Form(...), name: str = Form(...), standing: float = Form(0),
              export_rate: float = Form(0), signup_credit: float = Form(0),
+             discount_pct: float = Form(0), discount_months: int = Form(0),
              rates_as_of: str = Form(""), url: str = Form(""), notes: str = Form("")):
     c = conn()
     try:
-        c.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,signup_credit,rates_as_of,url,notes) "
-                  "VALUES(?,?,?,?,?,?,?,?)", (supplier, name, standing, export_rate, signup_credit, rates_as_of, url, notes))
+        c.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,signup_credit,"
+                  "discount_pct,discount_months,rates_as_of,url,notes) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                  (supplier, name, standing, export_rate, signup_credit, discount_pct, discount_months,
+                   rates_as_of, url, notes))
         c.commit()
     finally:
         c.close()
@@ -181,12 +186,14 @@ def plan_new(supplier: str = Form(...), name: str = Form(...), standing: float =
 @app.post("/plans/{plan_id}/update")
 def plan_update(plan_id: int, supplier: str = Form(...), name: str = Form(...), standing: float = Form(0),
                 export_rate: float = Form(0), signup_credit: float = Form(0),
+                discount_pct: float = Form(0), discount_months: int = Form(0),
                 rates_as_of: str = Form(""), url: str = Form(""), notes: str = Form(""), active: int = Form(1)):
     c = conn()
     try:
         c.execute("UPDATE plans SET supplier=?,name=?,standing_charge_annual=?,export_rate=?,signup_credit=?,"
-                  "rates_as_of=?,url=?,notes=?,active=? WHERE id=?",
-                  (supplier, name, standing, export_rate, signup_credit, rates_as_of, url, notes, active, plan_id))
+                  "discount_pct=?,discount_months=?,rates_as_of=?,url=?,notes=?,active=? WHERE id=?",
+                  (supplier, name, standing, export_rate, signup_credit, discount_pct, discount_months,
+                   rates_as_of, url, notes, active, plan_id))
         c.commit()
     finally:
         c.close()
@@ -209,10 +216,11 @@ def plan_duplicate(plan_id: int):
     c = conn()
     try:
         p = c.execute("SELECT * FROM plans WHERE id=?", (plan_id,)).fetchone()
-        cur = c.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,signup_credit,rates_as_of,url,notes,active) "
-                        "VALUES(?,?,?,?,?,?,?,?,?)",
+        cur = c.execute("INSERT INTO plans(supplier,name,standing_charge_annual,export_rate,signup_credit,"
+                        "discount_pct,discount_months,rates_as_of,url,notes,active) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                         (p["supplier"], p["name"] + " (copy)", p["standing_charge_annual"], p["export_rate"],
-                         p["signup_credit"], p["rates_as_of"], p["url"], p["notes"], p["active"]))
+                         p["signup_credit"], p["discount_pct"], p["discount_months"], p["rates_as_of"], p["url"],
+                         p["notes"], p["active"]))
         for b in c.execute("SELECT * FROM rate_bands WHERE plan_id=?", (plan_id,)).fetchall():
             c.execute("INSERT INTO rate_bands(plan_id,label,rate,start_time,end_time,dow_mask,priority) VALUES(?,?,?,?,?,?,?)",
                       (cur.lastrowid, b["label"], b["rate"], b["start_time"], b["end_time"], b["dow_mask"], b["priority"]))
