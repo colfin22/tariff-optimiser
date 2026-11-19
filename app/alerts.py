@@ -35,18 +35,40 @@ def check_and_notify(conn, today: date | None = None) -> dict:
 
     ranking = [r for r in engine.rank_plans(conn) if "error" not in r]
     current_id = db.get_setting(conn, "current_plan_id")
-    best = ranking[0] if ranking else None
-    current = next((r for r in ranking if str(r["plan_id"]) == current_id), None)
-    msg = f"Electricity contract ends {end:%d-%m-%Y} ({days_left} days)."
-    if best and current and best["plan_id"] != current["plan_id"]:
-        saving = current["annual_year1"] - best["annual_year1"]
-        msg += f" Cheapest for your usage: {best['supplier']} {best['name']} — €{best['annual_year1']:.0f}/yr (saves €{saving:.0f})."
-    elif best:
-        msg += f" Your current plan is still the cheapest (€{best['annual_year1']:.0f}/yr)."
+    msg = f"Electricity contract ends {end:%d-%m-%Y} ({days_left} days)." + renewal_message(ranking, current_id)
 
     _notify(conn, "Electricity contract", msg)
     db.set_setting(conn, marker_key, "1")
     return {"status": "alerted", "threshold": threshold, "days_left": days_left, "message": msg}
+
+
+def renewal_choice(ranking: list[dict], current_id: str) -> dict:
+    """What renewing actually compares: staying on the current plan once its contract ends (its
+    annual_ongoing — the standard rate, no signup credit) against the cheapest other plan's
+    annual_year1. Comparing year-1 against year-1 would measure the alternatives against a
+    discount that is about to end."""
+    current = next((r for r in ranking if str(r.get("plan_id")) == current_id), None) if current_id else None
+    alternatives = [r for r in ranking if "error" not in r and r is not current]
+    best = min(alternatives, key=lambda r: r["annual_year1"], default=None)
+    stay = current["annual_ongoing"] if current else None
+    return {"current": current, "best": best, "stay_cost": stay,
+            "saving": round(stay - best["annual_year1"], 2) if current and best else None}
+
+
+def renewal_message(ranking: list[dict], current_id: str) -> str:
+    c = renewal_choice(ranking, current_id)
+    current, best, stay = c["current"], c["best"], c["stay_cost"]
+    if current is None:  # no current plan set: just name the cheapest
+        return f" Cheapest for your usage: {best['supplier']} {best['name']} — €{best['annual_year1']:.0f}/yr." if best else ""
+    rolls_back = current.get("discount_pct", 0) > 0 and current.get("discount_months", 0) > 0
+    stay_txt = (f" Staying on {current['supplier']} {current['name']} goes back to its standard rate: about €{stay:.0f}/yr."
+                if rolls_back else "")
+    if best and c["saving"] > 0:
+        return stay_txt + (f" Cheapest for your usage: {best['supplier']} {best['name']} — "
+                           f"€{best['annual_year1']:.0f}/yr (saves €{c['saving']:.0f}).")
+    if rolls_back:
+        return stay_txt + " That is still the cheapest option for your usage."
+    return f" Your current plan is still the cheapest (€{stay:.0f}/yr)."
 
 
 def _notify(conn, title: str, message: str) -> None:

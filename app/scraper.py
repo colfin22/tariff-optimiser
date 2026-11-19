@@ -3,6 +3,10 @@ suggestions where they differ from stored plans. Never auto-applies — a human
 reviews on the Plans page. Selectra quotes unit rates ex-VAT (we store incl. 9%)
 and urban standing charges incl. VAT; band time WINDOWS are not published there,
 so only rates/standing/export are compared.
+
+Selectra's unit rates include the supplier's discount ("incl. discounts"), which is also how band
+rates are stored: the price paid during the discount. A plan's discount_pct / discount_months are
+entered by hand on the Plans page, so scraped rates and expiring discounts don't conflict.
 """
 import html
 import re
