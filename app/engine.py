@@ -47,6 +47,7 @@ class Plan:
     # once discount_months have passed. 0 = no expiring discount, the rates are permanent.
     discount_pct: float = 0.0
     discount_months: int = 0
+    exit_fee: float = 0.0  # charged for leaving before the contract end; only matters for the current plan
 
     @property
     def standard_factor(self) -> float:
@@ -124,6 +125,7 @@ def cost_plan(plan: Plan, readings: list[tuple[str, float, float]]) -> dict:
         "annual_year1": round(annual_year1, 2),
         "discount_pct": plan.discount_pct,
         "discount_months": plan.discount_months,
+        "exit_fee": plan.exit_fee,
         "per_band": {k: {"kwh": round(v["kwh"], 1), "eur": round(v["eur"], 2), "rate": v["rate"]}
                      for k, v in per_band.items()},
     }
@@ -139,7 +141,8 @@ def load_plans(conn, active_only: bool = True) -> list[Plan]:
         plans.append(Plan(supplier=p["supplier"], name=p["name"],
                           standing_charge_annual=p["standing_charge_annual"], export_rate=p["export_rate"],
                           signup_credit=p["signup_credit"], bands=bands, id=p["id"],
-                          discount_pct=p["discount_pct"], discount_months=p["discount_months"]))
+                          discount_pct=p["discount_pct"], discount_months=p["discount_months"],
+                          exit_fee=p["exit_fee"]))
     return plans
 
 

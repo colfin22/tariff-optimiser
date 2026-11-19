@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS plans (
     signup_credit REAL NOT NULL DEFAULT 0,           -- € one-off, year-1 only
     discount_pct REAL NOT NULL DEFAULT 0,            -- % off the standard unit rate; band rates are the discounted rates
     discount_months INTEGER NOT NULL DEFAULT 0,      -- how long the discount lasts; 0 = no expiring discount
+    exit_fee REAL NOT NULL DEFAULT 0,                -- € charged for leaving before the contract ends
     notes TEXT NOT NULL DEFAULT '',
     url TEXT NOT NULL DEFAULT '',
     rates_as_of TEXT NOT NULL DEFAULT '',            -- date the rates were checked
@@ -56,6 +57,7 @@ MIGRATIONS = {
     "plans": [
         ("discount_pct", "REAL NOT NULL DEFAULT 0"),
         ("discount_months", "INTEGER NOT NULL DEFAULT 0"),
+        ("exit_fee", "REAL NOT NULL DEFAULT 0"),
     ],
 }
 
