@@ -26,7 +26,9 @@ def check_and_notify(conn, today: date | None = None) -> dict:
     if end is None:
         return {"status": "no contract date set"}
     days_left = (end - today).days
-    threshold = next((t for t in (30, 7) if days_left <= t), None)
+    # The tightest threshold reached: 30 for 8-30 days left, 7 for the last week. next() over
+    # (30, 7) always picked 30, so the 7-day marker was never used and the second alert never sent.
+    threshold = min((t for t in (30, 7) if days_left <= t), default=None)
     if threshold is None or days_left < 0:
         return {"status": "ok", "days_left": days_left}
     marker_key = f"alerted_{end.isoformat()}_{threshold}"
