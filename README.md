@@ -57,6 +57,10 @@ the optional Home Assistant connection for notifications, and the manual HDF upl
   charge and annualises.
 - Plans and their rate bands are managed in the UI (`/plans`); seed data for the six main
   suppliers is in `app/seed.py` with an as-of date — rates are entered including VAT.
+- A plan can carry an expiring discount (Discount % for so many months) and an exit fee, set on
+  `/plans`. Year-1 cost uses the discounted rate for those months and the standard rate after.
+  At renewal, staying on your current plan is costed at its standard rate, not the discount
+  that is about to end, and switching before the contract end date includes the exit fee.
 - Contract-expiry alerts fire at 30 and 7 days via a Home Assistant notify service (`/settings`).
 - A weekly **scrape-and-suggest** job keeps the rates honest — see below.
 
@@ -110,6 +114,12 @@ Re-seed plans after editing them: `docker compose exec tariff python -m app.seed
 
 ## Tests
     python -m pytest tests/
+
+## Contributors
+Thanks to [tlatoani-ie](https://github.com/tlatoani-ie) for the expiring-discount and exit-fee
+costing ([#37](https://github.com/colfin22/tariff-optimiser/pull/37),
+[#38](https://github.com/colfin22/tariff-optimiser/pull/38)), which made the renewal comparison
+honest: staying put at the standard rate against switching, with the exit fee counted.
 
 ## Licence
 Built by Colm Finn — [MIT licensed](LICENSE).
