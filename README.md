@@ -120,6 +120,8 @@ Thanks to [tlatoani-ie](https://github.com/tlatoani-ie) for the expiring-discoun
 costing ([#37](https://github.com/colfin22/tariff-optimiser/pull/37),
 [#38](https://github.com/colfin22/tariff-optimiser/pull/38)), which made the renewal comparison
 honest: staying put at the standard rate against switching, with the exit fee counted.
+They also fixed the 7-day contract-expiry alert, which never fired after the 30-day one
+([#42](https://github.com/colfin22/tariff-optimiser/pull/42)).
 
 ## Licence
 Built by Colm Finn — [MIT licensed](LICENSE).
