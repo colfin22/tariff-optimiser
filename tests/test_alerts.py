@@ -139,3 +139,25 @@ def test_alert_has_no_exit_fee_on_contract_end_day(conn):
     r = alerts.check_and_notify(conn, today=date(2026, 12, 12))
     assert r["status"] == "alerted"
     assert "exit fee" not in r["message"]
+
+
+# --- alert thresholds -------------------------------------------------------------------------------
+
+def test_seven_day_alert_fires_after_the_30_day_one(conn):
+    cur = add_flat_plan(conn, "A", "Flat", 0.30)
+    add_flat_plan(conn, "B", "Flat", 0.28)
+    set_contract(conn, cur)  # contract ends 12-12-2026
+    first = alerts.check_and_notify(conn, today=date(2026, 11, 20))  # 22 days left
+    assert (first["status"], first["threshold"]) == ("alerted", 30)
+    again = alerts.check_and_notify(conn, today=date(2026, 11, 25))  # 17 days left
+    assert again["status"] == "already alerted"
+    week = alerts.check_and_notify(conn, today=date(2026, 12, 6))  # 6 days left
+    assert (week["status"], week["threshold"]) == ("alerted", 7)
+    assert alerts.check_and_notify(conn, today=date(2026, 12, 8))["status"] == "already alerted"
+
+
+def test_first_check_inside_the_last_week_sends_the_7_day_alert(conn):
+    cur = add_flat_plan(conn, "A", "Flat", 0.30)
+    set_contract(conn, cur)
+    r = alerts.check_and_notify(conn, today=date(2026, 12, 9))  # 3 days left, nothing sent yet
+    assert (r["status"], r["threshold"]) == ("alerted", 7)
